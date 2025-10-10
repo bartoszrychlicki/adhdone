@@ -92,5 +92,3 @@
 - Use fetchers for non-navigation data mutations.
 - Apply `route.lazy()` for route-level code splitting with automatic loading states.
 - Control data revalidation with `shouldRevalidate` after navigation.
-
-_Made by 10xDevs & Friends_
