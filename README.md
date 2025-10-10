@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Dziennik Rutyn Eryka (Eryk’s Routine Journal)
 
-## Getting Started
+![Project Status](https://img.shields.io/badge/status-in_development-yellow) ![License](https://img.shields.io/badge/license-TBD-lightgrey)
 
-First, run the development server:
+## Table of Contents
+- [1. Project Description](#1-project-description)
+- [2. Tech Stack](#2-tech-stack)
+- [3. Getting Started Locally](#3-getting-started-locally)
+- [4. Available Scripts](#4-available-scripts)
+- [5. Project Scope](#5-project-scope)
+- [6. Project Status](#6-project-status)
+- [7. License](#7-license)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## 1. Project Description
+Eryk’s Routine Journal is a mobile-first web app that gamifies daily chores for an 11-year-old. The child interface highlights the active task within morning, afternoon, and evening routines, adds a non-stop timer, and rewards fast completion with bonus points, achievements, and a rewards shop. A companion parent panel lets caregivers configure routines, manage task and reward catalogs, and review progress dashboards, easing the burden of constant reminders. The architecture is designed to scale to multiple children and guardians.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 2. Tech Stack
+- **Frontend:** Next.js 15.5 (React 19) with TypeScript 5, Tailwind CSS 4, and planned shadcn/ui patterns for reusable components.
+- **Backend & Data:** Supabase (PostgreSQL, Auth, Edge Functions) with Row Level Security policies for future multi-user isolation.
+- **AI & Integrations:** OpenRouter API for optional AI-powered assistance once activated.
+- **Infrastructure & DevOps:** GitHub Actions for CI/CD, DigitalOcean App Platform or Droplets for hosting, Supabase Cloud for managed data services.
+- **Tooling:** ESLint 9 (Next.js config) and Prettier for linting/formatting, Turbopack-powered Next scripts, Playwright earmarked for cross-browser E2E testing, npm (lockfile present) with pnpm support.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 3. Getting Started Locally
+1. **Prerequisites:** Node.js 20+ (aligns with Next.js 15 requirements). Install pnpm or npm; npm is used by the existing lockfile.
+2. **Install dependencies:**
+   ```bash
+   npm install
+   # or
+   pnpm install
+   ```
+3. **Configure environment:** Create a `.env.local` with Supabase credentials (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`) and optional `OPENROUTER_API_KEY` when enabling AI helpers.
+4. **Run the dev server:**
+   ```bash
+   npm run dev
+   ```
+   The app is available at `http://localhost:3000`. The current layout is rooted in `src/app`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 4. Available Scripts
+- `npm run dev` – Launches the Turbopack development server with fast refresh.
+- `npm run build` – Produces an optimized production build.
+- `npm run start` – Starts the production server after a build.
+- `npm run lint` – Runs ESLint with the Next.js ruleset; resolve warnings before opening a PR.
 
-## Learn More
+## 5. Project Scope
+- **In scope for MVP:** Parent onboarding, CRUD for routines/tasks/rewards, dashboard with daily progress and history, child routine flow with highlighted tasks, irreversible timer, scoring system, achievements, and reward redemption experience.
+- **Prepared for later phases:** Multi-child accounts, richer analytics, AI nudges, voice assistant, offline mode, automation rules, printable summaries, and marketplace integrations remain outside the initial release.
 
-To learn more about Next.js, take a look at the following resources:
+## 6. Project Status
+The project is in active development, transitioning from product specification to implementation. Core UI scaffolding exists in Next.js, while Supabase integration, shadcn/ui components, automated tests (Playwright/Jest), and CI pipelines are scheduled next. Document gaps (e.g., test coverage expectations, finalized Node version) should be resolved as the MVP matures.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 7. License
+The license is not yet specified. All rights reserved until an explicit license is added to the repository.
