@@ -1,0 +1,265 @@
+1. Lista tabel z ich kolumnami, typami danych i ograniczeniami
+- **Typy ENUM**
+  - `profile_role`: `parent`, `child`, `admin`.
+  - `routine_type`: `morning`, `afternoon`, `evening`, `custom`.
+  - `routine_session_status`: `scheduled`, `in_progress`, `completed`, `auto_closed`, `skipped`, `expired`.
+  - `point_transaction_type`: `task_completion`, `routine_bonus`, `manual_adjustment`, `reward_redeem`.
+  - `reward_redemption_status`: `pending`, `approved`, `fulfilled`, `rejected`, `cancelled`.
+- **families**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `family_name text` NOT NULL.
+  - `timezone text` NOT NULL default `'Europe/Warsaw'`.
+  - `settings jsonb` NOT NULL default `'{}'::jsonb` (np. konfiguracja onboarding, preferencje notyfikacji).
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - `deleted_at timestamptz`.
+- **profiles**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `family_id uuid` NOT NULL REFERENCES `families(id)` ON DELETE CASCADE.
+  - `auth_user_id uuid` UNIQUE REFERENCES `auth.users(id)` ON DELETE CASCADE.
+  - `role profile_role` NOT NULL.
+  - `display_name text` NOT NULL.
+  - `email citext`.
+  - `avatar_url text`.
+  - `last_login_at timestamptz`.
+  - `pin_hash text` (argon2 hash, tylko dla dzieci).
+  - `pin_failed_attempts integer` NOT NULL default 0 CHECK (`pin_failed_attempts >= 0`).
+  - `pin_lock_expires_at timestamptz`.
+  - `settings jsonb` NOT NULL default `'{}'::jsonb`.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - `deleted_at timestamptz`.
+  - CHECK (`role <> 'parent' OR auth_user_id IS NOT NULL`).
+- **child_access_tokens**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE (wymagane `role = 'child'`).
+  - `token text` NOT NULL UNIQUE (stały identyfikator URL).
+  - `created_by_profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE SET NULL (rodzic).
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `last_used_at timestamptz`.
+  - `deactivated_at timestamptz`.
+  - `deactivated_by_profile_id uuid` REFERENCES `profiles(id)` ON DELETE SET NULL.
+  - `metadata jsonb` NOT NULL default `'{}'::jsonb`.
+- **routines**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `family_id uuid` NOT NULL REFERENCES `families(id)` ON DELETE CASCADE.
+  - `name text` NOT NULL.
+  - `slug text` NOT NULL.
+  - `routine_type routine_type` NOT NULL default `'custom'`.
+  - `start_time time` (początek okna rutyny w lokalnym czasie rodziny).
+  - `end_time time`.
+  - `auto_close_after_minutes integer` CHECK (`auto_close_after_minutes IS NULL OR auto_close_after_minutes > 0`).
+  - `is_active boolean` NOT NULL default true.
+  - `settings jsonb` NOT NULL default `'{}'::jsonb`.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - `deleted_at timestamptz`.
+  - UNIQUE (`family_id`, `slug`).
+- **child_routines**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `routine_id uuid` NOT NULL REFERENCES `routines(id)` ON DELETE CASCADE.
+  - `child_profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `position smallint` NOT NULL default 1 CHECK (`position > 0`).
+  - `is_enabled boolean` NOT NULL default true.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - `deleted_at timestamptz`.
+  - UNIQUE (`routine_id`, `child_profile_id`).
+- **routine_tasks**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `routine_id uuid` NOT NULL REFERENCES `routines(id)` ON DELETE CASCADE.
+  - `child_profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `name text` NOT NULL.
+  - `description text`.
+  - `points integer` NOT NULL default 0 CHECK (`points >= 0`).
+  - `position smallint` NOT NULL CHECK (`position > 0`).
+  - `is_optional boolean` NOT NULL default false.
+  - `is_active boolean` NOT NULL default true.
+  - `expected_duration_seconds integer` CHECK (`expected_duration_seconds IS NULL OR expected_duration_seconds > 0`).
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - `deleted_at timestamptz`.
+  - UNIQUE (`child_profile_id`, `routine_id`, `position`).
+- **routine_sessions**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `routine_id uuid` NOT NULL REFERENCES `routines(id)` ON DELETE CASCADE.
+  - `child_profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `session_date date` NOT NULL.
+  - `status routine_session_status` NOT NULL default `'scheduled'`.
+  - `started_at timestamptz`.
+  - `completed_at timestamptz`.
+  - `planned_end_at timestamptz`.
+  - `duration_seconds integer` CHECK (`duration_seconds IS NULL OR duration_seconds >= 0`).
+  - `points_awarded integer` NOT NULL default 0 CHECK (`points_awarded >= 0`).
+  - `bonus_multiplier numeric(4,2)` NOT NULL default 1.00 CHECK (`bonus_multiplier >= 1`).
+  - `best_time_beaten boolean` NOT NULL default false.
+  - `completion_reason text`.
+  - `auto_closed_at timestamptz`.
+  - `notes text`.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - UNIQUE (`child_profile_id`, `routine_id`, `session_date`).
+- **task_completions**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `routine_session_id uuid` NOT NULL REFERENCES `routine_sessions(id)` ON DELETE CASCADE.
+  - `routine_task_id uuid` NOT NULL REFERENCES `routine_tasks(id)` ON DELETE SET NULL.
+  - `position smallint` NOT NULL CHECK (`position > 0`).
+  - `completed_at timestamptz` NOT NULL default `now()`.
+  - `points_awarded integer` NOT NULL CHECK (`points_awarded >= 0`).
+  - `was_bonus boolean` NOT NULL default false.
+  - `duration_since_session_start_seconds integer` CHECK (`duration_since_session_start_seconds IS NULL OR duration_since_session_start_seconds >= 0`).
+  - `metadata jsonb` NOT NULL default `'{}'::jsonb`.
+  - UNIQUE (`routine_session_id`, `routine_task_id`).
+  - UNIQUE (`routine_session_id`, `position`).
+- **routine_performance_stats**
+  - `child_profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `routine_id uuid` NOT NULL REFERENCES `routines(id)` ON DELETE CASCADE.
+  - `best_duration_seconds integer` CHECK (`best_duration_seconds IS NULL OR best_duration_seconds > 0`).
+  - `best_session_id uuid` REFERENCES `routine_sessions(id)` ON DELETE SET NULL.
+  - `streak_days integer` NOT NULL default 0 CHECK (`streak_days >= 0`).
+  - `last_completed_session_id uuid` REFERENCES `routine_sessions(id)` ON DELETE SET NULL.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - PRIMARY KEY (`child_profile_id`, `routine_id`).
+- **point_transactions**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `family_id uuid` NOT NULL REFERENCES `families(id)` ON DELETE CASCADE.
+  - `profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `transaction_type point_transaction_type` NOT NULL.
+  - `points_delta integer` NOT NULL CHECK (`points_delta <> 0`).
+  - `balance_after integer` NOT NULL.
+  - `reference_id uuid`.
+  - `reference_table text`.
+  - `metadata jsonb` NOT NULL default `'{}'::jsonb`.
+  - `reason text`.
+  - `created_by_profile_id uuid` REFERENCES `profiles(id)` ON DELETE SET NULL.
+  - `created_at timestamptz` NOT NULL default `now()`.
+- **rewards**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `family_id uuid` NOT NULL REFERENCES `families(id)` ON DELETE CASCADE.
+  - `name text` NOT NULL.
+  - `description text`.
+  - `cost_points integer` NOT NULL CHECK (`cost_points > 0`).
+  - `is_repeatable boolean` NOT NULL default true.
+  - `is_active boolean` NOT NULL default true.
+  - `settings jsonb` NOT NULL default `'{}'::jsonb`.
+  - `created_by_profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE SET NULL.
+  - `updated_by_profile_id uuid` REFERENCES `profiles(id)` ON DELETE SET NULL.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - `deleted_at timestamptz`.
+  - UNIQUE (`family_id`, `name`) WHERE `deleted_at IS NULL`.
+- **reward_child_visibility**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `reward_id uuid` NOT NULL REFERENCES `rewards(id)` ON DELETE CASCADE.
+  - `child_profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `is_visible boolean` NOT NULL default true.
+  - `visible_from timestamptz`.
+  - `visible_until timestamptz`.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - `deleted_at timestamptz`.
+  - UNIQUE (`reward_id`, `child_profile_id`).
+- **reward_redemptions**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `reward_id uuid` NOT NULL REFERENCES `rewards(id)` ON DELETE CASCADE.
+  - `child_profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `status reward_redemption_status` NOT NULL default `'pending'`.
+  - `points_cost integer` NOT NULL CHECK (`points_cost > 0`).
+  - `point_transaction_id uuid` REFERENCES `point_transactions(id)` ON DELETE SET NULL.
+  - `requested_at timestamptz` NOT NULL default `now()`.
+  - `confirmed_at timestamptz`.
+  - `confirmed_by_profile_id uuid` REFERENCES `profiles(id)` ON DELETE SET NULL.
+  - `cancelled_at timestamptz`.
+  - `cancelled_by_profile_id uuid` REFERENCES `profiles(id)` ON DELETE SET NULL.
+  - `notes text`.
+  - `metadata jsonb` NOT NULL default `'{}'::jsonb`.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+- **achievements**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `code text` NOT NULL UNIQUE.
+  - `name text` NOT NULL.
+  - `description text`.
+  - `criteria jsonb` NOT NULL (warunki przyznania).
+  - `icon_url text`.
+  - `is_active boolean` NOT NULL default true.
+  - `family_id uuid` REFERENCES `families(id)` ON DELETE CASCADE.
+  - `created_by_profile_id uuid` REFERENCES `profiles(id)` ON DELETE SET NULL.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - `updated_at timestamptz` NOT NULL default `now()`.
+  - `deleted_at timestamptz`.
+- **user_achievements**
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `achievement_id uuid` NOT NULL REFERENCES `achievements(id)` ON DELETE CASCADE.
+  - `awarded_at timestamptz` NOT NULL default `now()`.
+  - `awarded_by_profile_id uuid` REFERENCES `profiles(id)` ON DELETE SET NULL.
+  - `metadata jsonb` NOT NULL default `'{}'::jsonb`.
+  - UNIQUE (`profile_id`, `achievement_id`).
+- **family_points_snapshots** (agregaty do dashboardów)
+  - `id uuid` PK, default `gen_random_uuid()`.
+  - `family_id uuid` NOT NULL REFERENCES `families(id)` ON DELETE CASCADE.
+  - `profile_id uuid` NOT NULL REFERENCES `profiles(id)` ON DELETE CASCADE.
+  - `snapshot_date date` NOT NULL.
+  - `points_balance integer` NOT NULL.
+  - `earned_points integer` NOT NULL default 0.
+  - `spent_points integer` NOT NULL default 0.
+  - `created_at timestamptz` NOT NULL default `now()`.
+  - UNIQUE (`profile_id`, `snapshot_date`).
+
+2. Relacje między tabelami
+- `families 1..n profiles` (rodzina ma wielu członków; `profiles.family_id`).
+- `profiles 1..n child_access_tokens` (dziecko może mieć wiele tokenów logowania).
+- `families 1..n routines`; `routines 1..n routine_tasks`; `profiles (child)` 1..n `routine_tasks`.
+- `routines 1..n child_routines`; `profiles (child)` 1..n `child_routines` (włączenie/wyłączenie rutyny dla dziecka).
+- `routine_tasks 1..n task_completions` poprzez `routine_sessions`; `routine_sessions` 1..n `task_completions`.
+- `profiles (child)` 1..n `routine_sessions`; `routines 1..n routine_sessions`.
+- `routine_sessions` n..1 `point_transactions` (poprzez `point_transactions.reference_id` dla wpisów typu `task_completion` lub `routine_bonus`).
+- `families 1..n rewards`; `rewards` 1..n `reward_child_visibility`; `profiles (child)` 1..n `reward_child_visibility`.
+- `reward_redemptions` 1..1 `point_transactions` (odwołanie przez `point_transaction_id`).
+- `achievements 1..n user_achievements`; `profiles` 1..n `user_achievements`.
+- `routine_sessions` 1..1 `routine_performance_stats` (referencje `best_session_id`, `last_completed_session_id`).
+- `families 1..n point_transactions`; `profiles` 1..n point_transactions`.
+- `families 1..n family_points_snapshots`; `profiles` 1..n family_points_snapshots`.
+
+3. Indeksy
+- `profiles_family_role_idx` ON `profiles(family_id, role)` dla filtracji UI i RLS.
+- `profiles_auth_uid_idx` UNIQUE ON `profiles(auth_user_id)` (wymagane przez Supabase).
+- `child_access_tokens_active_idx` UNIQUE ON `child_access_tokens(profile_id)` WHERE `deactivated_at IS NULL` dla aktywnego tokenu dziecka.
+- `routines_family_active_idx` ON `routines(family_id)` INCLUDE (`is_active`).
+- `routine_tasks_child_order_idx` ON `routine_tasks(child_profile_id, routine_id, position)` dla sortowania list.
+- `routine_sessions_child_date_idx` ON `routine_sessions(child_profile_id, session_date DESC)`.
+- `routine_sessions_status_idx` ON `routine_sessions(status)` dla dashboardów operacyjnych.
+- `task_completions_session_order_idx` ON `task_completions(routine_session_id, position)`.
+- `point_transactions_profile_created_idx` ON `point_transactions(profile_id, created_at DESC)`.
+- `point_transactions_family_type_idx` ON `point_transactions(family_id, transaction_type)`.
+- `rewards_family_active_idx` ON `rewards(family_id)` WHERE `deleted_at IS NULL`.
+- `reward_child_visibility_window_idx` ON `reward_child_visibility(child_profile_id, visible_from, visible_until)`.
+- `reward_redemptions_child_status_idx` ON `reward_redemptions(child_profile_id, status)`.
+- `user_achievements_profile_idx` ON `user_achievements(profile_id)`.
+- `routine_performance_stats_child_idx` ON `routine_performance_stats(child_profile_id)`.
+- `family_points_snapshots_profile_date_idx` ON `family_points_snapshots(profile_id, snapshot_date DESC)`.
+
+4. Zasady PostgreSQL (RLS)
+- Globalnie włącz RLS (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY`) na: `families`, `profiles`, `child_access_tokens`, `routines`, `child_routines`, `routine_tasks`, `routine_sessions`, `task_completions`, `routine_performance_stats`, `point_transactions`, `rewards`, `reward_child_visibility`, `reward_redemptions`, `achievements`, `user_achievements`, `family_points_snapshots`.
+- **Polityki rodzica (`role = parent` w JWT)**:
+  - `profiles`: `USING (family_id = (SELECT family_id FROM profiles p WHERE p.auth_user_id = auth.uid() AND p.role IN ('parent','admin') LIMIT 1))`.
+  - `families`: `USING (id = (SELECT family_id FROM profiles p WHERE p.auth_user_id = auth.uid() LIMIT 1))`.
+  - Pozostałe tabele z kolumną `family_id`: `USING (family_id = (SELECT family_id FROM profiles p WHERE p.auth_user_id = auth.uid() LIMIT 1))`.
+  - Tabele z `child_profile_id`: `USING (child_profile_id IN (SELECT id FROM profiles WHERE family_id = (SELECT family_id FROM profiles p WHERE p.auth_user_id = auth.uid() LIMIT 1)))`.
+  - Uprawnienia `SELECT`, `INSERT`, `UPDATE`; `DELETE` ograniczone do rekordów bez `deleted_at`.
+- **Polityki dziecka (`role = child` przekazane w `request.jwt.claims.profile_id`)**:
+  - `profiles`: `USING (id = current_setting('request.jwt.claims.profile_id', true)::uuid)`.
+  - `child_access_tokens`: `USING (profile_id = current_setting('request.jwt.claims.profile_id', true)::uuid)`; `INSERT` zabronione.
+  - Tabele z `child_profile_id`: `USING (child_profile_id = current_setting('request.jwt.claims.profile_id', true)::uuid)`.
+  - Dostęp wyłącznie do `SELECT`, `UPDATE` na `routine_sessions` ograniczony do statusów kontrolowanych aplikacyjnie; brak `DELETE`.
+- **Polityki administracyjne**:
+  - `USING (current_setting('request.jwt.claims.role', true) = 'admin')` zapewniają pełny dostęp serwisowym tokenom Supabase (`service_role` nadal ma bypass).
+- **Soft delete**: operacja `DELETE` w UI powinna być realizowana przez `UPDATE SET deleted_at = now()`; faktyczny `DELETE` zarezerwowany dla `service_role`.
+
+5. Dodatkowe uwagi
+- Soft delete (`deleted_at`) na konfigurowalnych bytach (`families`, `profiles`, `routines`, `child_routines`, `routine_tasks`, `rewards`, `reward_child_visibility`, `achievements`) utrzymuje spójność historycznych sesji i transakcji.
+- `family_points_snapshots`, materializowane widoki lub funkcje agregujące można zasilać z Edge Functions/Supabase cron, aby odciążyć zapytania dashboardu rodzica.
+- `point_transactions.balance_after` pozwala na łatwe obliczenie salda bez okien czasowych; integracja z Supabase Realtime umożliwia natychmiastowe aktualizacje licznika punktów.
+- `routine_performance_stats` przechowuje rekordy czasowe używane do naliczania podwójnych punktów; recalculacja następuje po zakończeniu sesji.
+- Zalecane jest tworzenie widoków tylko-do-odczytu łączących `routine_tasks` i `task_completions` dla uproszczenia UI oraz użycie `policies` grantujących dostęp tym widokom z analogicznymi regułami RLS.
