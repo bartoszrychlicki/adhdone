@@ -23,3 +23,4 @@
 - ESLint + Prettier for linting and formatting
 - pnpm (preferred) or npm for package management
 - Playwright for cross-browser E2E testing automation
+

@@ -1,4 +1,6 @@
 1. Lista tabel z ich kolumnami, typami danych i ograniczeniami
+Tabela users będzie bezpośrednio zarządzana przez supabase auth, dlatego jej tutaj nie ma. 
+
 - **Typy ENUM**
   - `profile_role`: `parent`, `child`, `admin`.
   - `routine_type`: `morning`, `afternoon`, `evening`, `custom`.
