@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../../_lib/authContext"
 import {
   ForbiddenError,
@@ -15,9 +15,9 @@ import {
 import { readJsonBody } from "../../../../_lib/request"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     childId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -25,26 +25,27 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
 
-    const childId = ensureUuid(context.params.childId, "childId")
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    if (authContext.role === "child" && authContext.profileId !== childId) {
+    if (authContext.role === "child" && authContext.profileId !== childIdValidated) {
       throw new ForbiddenError("Children can only view their own sessions")
     }
 
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, childId, authContext.familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
 
     const query = parseSessionListQuery(request.nextUrl.searchParams)
     const offset = (query.page - 1) * query.pageSize
 
     const sessions = await listChildSessions(supabase, {
-      childProfileId: childId,
+      childProfileId: childIdValidated,
       status: query.status,
       fromDate: query.fromDate,
       toDate: query.toDate,
@@ -66,9 +67,11 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
 
-    const childId = ensureUuid(context.params.childId, "childId")
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
@@ -76,18 +79,17 @@ export async function POST(
 
     if (
       authContext.role === "child" &&
-      authContext.profileId !== childId
+      authContext.profileId !== childIdValidated
     ) {
       throw new ForbiddenError("Children can only start their own sessions")
     }
 
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, childId, authContext.familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
 
     const payload = await readJsonBody(request)
     const command = parseSessionCreatePayload(payload)
 
-    const session = await startRoutineSession(supabase, childId, command)
+    const session = await startRoutineSession(supabase, childIdValidated, command)
     return NextResponse.json(session, { status: 201 })
   } catch (error) {
     return handleRouteError(error)

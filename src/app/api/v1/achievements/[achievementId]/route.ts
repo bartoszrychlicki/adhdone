@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import { assertParentOrAdmin, requireAuthContext } from "../../../_lib/authContext"
 import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../_lib/errors"
 import { ensureUuid } from "../../../_lib/validation"
@@ -11,7 +11,7 @@ async function ensureAchievementFamily(
   achievementId: string,
   familyId: string
 ): Promise<void> {
-  const supabase = createSupabaseClient()
+  const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase
     .from("achievements")
     .select("family_id")
@@ -32,9 +32,9 @@ async function ensureAchievementFamily(
 }
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     achievementId: string
-  }
+  }>
 }
 
 export async function PATCH(
@@ -42,21 +42,22 @@ export async function PATCH(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const achievementId = ensureUuid(context.params.achievementId, "achievementId")
+    const { achievementId } = await context.params
+    const achievementIdValidated = ensureUuid(achievementId, "achievementId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    await ensureAchievementFamily(achievementId, familyId)
+    await ensureAchievementFamily(achievementIdValidated, familyId)
     const payload = await readJsonBody(request)
     const command = parseUpdateAchievementPayload(payload)
 
-    const supabase = createSupabaseClient()
-    const achievement = await updateAchievement(supabase, achievementId, command)
+    const achievement = await updateAchievement(supabase, achievementIdValidated, command)
 
     return NextResponse.json(achievement, { status: 200 })
   } catch (error) {
@@ -69,18 +70,19 @@ export async function DELETE(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const achievementId = ensureUuid(context.params.achievementId, "achievementId")
+    const { achievementId } = await context.params
+    const achievementIdValidated = ensureUuid(achievementId, "achievementId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    await ensureAchievementFamily(achievementId, familyId)
-    const supabase = createSupabaseClient()
-    await updateAchievement(supabase, achievementId, { deletedAt: new Date().toISOString(), isActive: false })
+    await ensureAchievementFamily(achievementIdValidated, familyId)
+    await updateAchievement(supabase, achievementIdValidated, { deletedAt: new Date().toISOString(), isActive: false })
 
     return NextResponse.json({ message: "Achievement archived" }, { status: 200 })
   } catch (error) {

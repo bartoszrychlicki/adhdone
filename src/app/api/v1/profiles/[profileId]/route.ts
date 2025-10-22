@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../_lib/authContext"
 import {
   ForbiddenError,
@@ -18,9 +18,9 @@ import { readJsonBody } from "../../../_lib/request"
 import { hasActiveToken } from "../../../_services/tokensService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     profileId: string
-  }
+  }>
 }
 
 export async function PATCH(
@@ -28,8 +28,11 @@ export async function PATCH(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
-    const profileId = ensureUuid(context.params.profileId, "profileId")
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
+    const { profileId } = await context.params
+    const profileIdValidated = ensureUuid(profileId, "profileId")
 
     const payload = await readJsonBody(request)
     const command = parseProfileUpdatePayload(payload)
@@ -38,22 +41,20 @@ export async function PATCH(
       throw new ForbiddenError("Profile is not associated with a family")
     }
 
-    const supabase = createSupabaseClient()
-
-    if (authContext.role === "child" && authContext.profileId !== profileId) {
+    if (authContext.role === "child" && authContext.profileId !== profileIdValidated) {
       throw new ForbiddenError("Children can only update their own profile")
     }
 
     const targetProfile = await ensureProfileInFamily(
       supabase,
-      profileId,
+      profileIdValidated,
       authContext.familyId
     )
 
     if (
       authContext.role !== "parent" &&
       authContext.role !== "admin" &&
-      authContext.profileId !== profileId
+      authContext.profileId !== profileIdValidated
     ) {
       throw new ForbiddenError("Insufficient permissions to update profile")
     }
@@ -63,7 +64,7 @@ export async function PATCH(
     }
 
     if (command.deletedAt) {
-      const activeToken = await hasActiveToken(supabase, profileId)
+      const activeToken = await hasActiveToken(supabase, profileIdValidated)
       if (activeToken) {
         throw new ForbiddenError(
           "Cannot delete profile with active child access token"
@@ -71,9 +72,9 @@ export async function PATCH(
       }
     }
 
-    await updateProfile(supabase, profileId, command)
+    await updateProfile(supabase, profileIdValidated, command)
 
-    const updatedProfile = await getProfileById(supabase, profileId)
+    const updatedProfile = await getProfileById(supabase, profileIdValidated)
     return NextResponse.json(updatedProfile, { status: 200 })
   } catch (error) {
     return handleRouteError(error)

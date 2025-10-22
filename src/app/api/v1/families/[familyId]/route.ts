@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertFamilyAccess,
   assertParentOrAdmin,
@@ -12,9 +12,9 @@ import { ensureUuid } from "../../../_lib/validation"
 import { readJsonBody } from "../../../_lib/request"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     familyId: string
-  }
+  }>
 }
 
 export async function PATCH(
@@ -22,17 +22,18 @@ export async function PATCH(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const familyId = ensureUuid(context.params.familyId, "familyId")
-    assertFamilyAccess(authContext, familyId)
+    const { familyId } = await context.params
+    const familyIdValidated = ensureUuid(familyId, "familyId")
+    assertFamilyAccess(authContext, familyIdValidated)
 
     const payload = await readJsonBody(request)
     const command = parseFamilyUpdatePayload(payload)
 
-    const supabase = createSupabaseClient()
-    const family = await updateFamily(supabase, familyId, command)
+    const family = await updateFamily(supabase, familyIdValidated, command)
 
     return NextResponse.json(family, { status: 200 })
   } catch (error) {

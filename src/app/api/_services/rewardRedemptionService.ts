@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type {
   CreateRewardRedemptionCommand,
@@ -13,8 +12,9 @@ import {
   NotFoundError,
   ValidationError
 } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 type RewardRow = Database["public"]["Tables"]["rewards"]["Row"]
 type RedemptionRow = Database["public"]["Tables"]["reward_redemptions"]["Row"]

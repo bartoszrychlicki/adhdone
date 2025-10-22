@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
@@ -13,9 +13,9 @@ import { ensureRoutineInFamily } from "../../../../_services/routinesService"
 import { listChildAssignments } from "../../../../_services/childRoutinesService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     routineId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -23,16 +23,18 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const routineId = ensureUuid(context.params.routineId, "routineId")
-    const supabase = createSupabaseClient()
-    await ensureRoutineInFamily(supabase, routineId, authContext.familyId)
+    const { routineId } = await context.params
+    const routineIdValidated = ensureUuid(routineId, "routineId")
+    await ensureRoutineInFamily(supabase, routineIdValidated, authContext.familyId)
 
     const includeDisabled = parseBoolean(
       request.nextUrl.searchParams.get("includeDisabled"),
@@ -41,7 +43,7 @@ export async function GET(
 
     const assignments = await listChildAssignments(
       supabase,
-      routineId,
+      routineIdValidated,
       includeDisabled
     )
 

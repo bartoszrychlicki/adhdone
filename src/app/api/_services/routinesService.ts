@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type {
   RoutineArchiveResultDto,
@@ -15,8 +14,9 @@ import {
   mapSupabaseError,
   NotFoundError
 } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 type RoutineRow = Database["public"]["Tables"]["routines"]["Row"]
 type RoutineInsert = Database["public"]["Tables"]["routines"]["Insert"]

@@ -1,22 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../_lib/supabase"
-import { requireAuthContext } from "../../../../../_lib/authContext"
-import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../../../_lib/errors"
-import { ensureUuid } from "../../../../../_lib/validation"
-import { readJsonBody } from "../../../../../_lib/request"
-import { parseRedeemPayload } from "../../../../../_validators/reward"
-import { createRewardRedemption } from "../../../../../_services/rewardRedemptionService"
-import { ensureProfileInFamily } from "../../../../../_services/profilesService"
+import { createSupabaseServerClient } from "@/lib/supabase"
+import { requireAuthContext } from "../../../../_lib/authContext"
+import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../../_lib/errors"
+import { ensureUuid } from "../../../../_lib/validation"
+import { readJsonBody } from "../../../../_lib/request"
+import { parseRedeemPayload } from "../../../../_validators/reward"
+import { createRewardRedemption } from "../../../../_services/rewardRedemptionService"
+import { ensureProfileInFamily } from "../../../../_services/profilesService"
 
 async function ensureRewardFamily(
-  rewardId: string,
+  rewardIdValidated: string,
   familyId: string
 ): Promise<void> {
-  const supabase = createSupabaseClient()
+  const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase
     .from("rewards")
     .select("family_id")
-    .eq("id", rewardId)
+    .eq("id", rewardIdValidated)
     .maybeSingle()
 
   if (error) {
@@ -29,9 +29,9 @@ async function ensureRewardFamily(
 }
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     rewardId: string
-  }
+  }>
 }
 
 export async function POST(
@@ -39,13 +39,16 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const rewardId = ensureUuid(context.params.rewardId, "rewardId")
+    const { rewardId } = await context.params
+    const rewardIdValidated = ensureUuid(rewardId, "rewardId")
     const payload = await readJsonBody(request)
     const command = parseRedeemPayload(payload)
 
@@ -55,14 +58,12 @@ export async function POST(
     ) {
       throw new ForbiddenError("Children can only redeem for themselves")
     }
-
-    const supabase = createSupabaseClient()
-    await ensureRewardFamily(rewardId, familyId)
+    await ensureRewardFamily(rewardIdValidated, familyId)
     await ensureProfileInFamily(supabase, command.childProfileId, familyId)
 
     const redemption = await createRewardRedemption(
       supabase,
-      rewardId,
+      rewardIdValidated,
       familyId,
       command
     )

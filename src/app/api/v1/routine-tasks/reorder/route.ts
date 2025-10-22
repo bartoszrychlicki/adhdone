@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
@@ -20,7 +20,9 @@ import { reorderRoutineTasks } from "../../../_services/routineTasksService"
 
 export async function PATCH(request: NextRequest): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
     if (!authContext.familyId) {
@@ -35,8 +37,6 @@ export async function PATCH(request: NextRequest): Promise<Response> {
       command.childProfileId,
       "childProfileId"
     )
-
-    const supabase = createSupabaseClient()
     await ensureRoutineInFamily(supabase, routineId, authContext.familyId)
     await ensureProfileInFamily(supabase, childProfileId, authContext.familyId)
     await assertChildAssignedToRoutine(supabase, routineId, childProfileId)

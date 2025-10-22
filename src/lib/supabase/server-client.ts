@@ -1,38 +1,51 @@
-import { cookies } from 'next/headers'
-import { createServerClient, type CookieMethodsServer } from '@supabase/ssr'
+import { cookies } from "next/headers"
+import { createServerClient } from "@supabase/ssr"
 
-import type { Database } from '../../../supabase/types/database.types'
+import type { Database } from "../../../supabase/types/database.types"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 if (!supabaseUrl) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable.')
+  throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL environment variable.")
 }
 
 if (!supabaseAnonKey) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable.')
+  throw new Error("Missing NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable.")
 }
 
-export function createSupabaseServerClient() {
-  const cookieStore = cookies()
-  const cookieMethods: CookieMethodsServer = {
-    getAll() {
-      return cookieStore.getAll()
-    },
+type ServerClientOptions = {
+  allowCookiePersistence?: boolean
+}
+
+export async function createSupabaseServerClient(options: ServerClientOptions = {}) {
+  async function getCookieStore() {
+    return cookies()
   }
 
-  const setFn = (cookieStore as unknown as { set?: (name: string, value: string) => void }).set
-
-  if (typeof setFn === 'function') {
-    cookieMethods.setAll = (cookiesToSet) => {
-      cookiesToSet.forEach(({ name, value }) => {
-        setFn(name, value)
-      })
-    }
-  }
+  const allowWrites = options.allowCookiePersistence === true
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
-    cookies: cookieMethods,
+    cookies: {
+      async get(name) {
+        return (await getCookieStore()).get(name)?.value
+      },
+      async set(name, value, cookieOptions) {
+        if (!allowWrites) {
+          return
+        }
+
+        const store = await getCookieStore()
+        store.set({ name, value, ...cookieOptions })
+      },
+      async remove(name, cookieOptions) {
+        if (!allowWrites) {
+          return
+        }
+
+        const store = await getCookieStore()
+        store.delete({ name, ...cookieOptions })
+      },
+    },
   })
 }

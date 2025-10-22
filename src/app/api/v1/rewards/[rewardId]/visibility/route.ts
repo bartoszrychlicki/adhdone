@@ -1,25 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../_lib/supabase"
-import { assertParentOrAdmin, requireAuthContext } from "../../../../../_lib/authContext"
-import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../../../_lib/errors"
-import { ensureUuid } from "../../../../../_lib/validation"
-import { listRewardVisibility } from "../../../../../_services/rewardVisibilityService"
+import { createSupabaseServerClient } from "@/lib/supabase"
+import { assertParentOrAdmin, requireAuthContext } from "../../../../_lib/authContext"
+import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../../_lib/errors"
+import { ensureUuid } from "../../../../_lib/validation"
+import { listRewardVisibility } from "../../../../_services/rewardVisibilityService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     rewardId: string
-  }
+  }>
 }
 
 async function ensureRewardFamily(
-  rewardId: string,
+  rewardIdValidated: string,
   familyId: string
 ): Promise<void> {
-  const supabase = createSupabaseClient()
+  const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase
     .from("rewards")
     .select("family_id")
-    .eq("id", rewardId)
+    .eq("id", rewardIdValidated)
     .maybeSingle()
 
   if (error) {
@@ -36,18 +36,20 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const rewardId = ensureUuid(context.params.rewardId, "rewardId")
+    const { rewardId } = await context.params
+    const rewardIdValidated = ensureUuid(rewardId, "rewardId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    await ensureRewardFamily(rewardId, familyId)
-    const supabase = createSupabaseClient()
-    const visibility = await listRewardVisibility(supabase, rewardId)
+    await ensureRewardFamily(rewardIdValidated, familyId)
+    const visibility = await listRewardVisibility(supabase, rewardIdValidated)
 
     return NextResponse.json(visibility, { status: 200 })
   } catch (error) {

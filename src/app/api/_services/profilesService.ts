@@ -1,5 +1,4 @@
 import { randomBytes, scryptSync } from "crypto"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type {
   CreateChildProfileCommand,
@@ -12,15 +11,17 @@ import type {
   PinUpdateResultDto
 } from "@/types"
 import {
+  ConflictError,
   ForbiddenError,
   mapSupabaseError,
   NotFoundError,
   ValidationError
 } from "../_lib/errors"
 import type { AuthContext } from "../_lib/authContext"
+import type { AppSupabaseClient } from "../_lib/types"
 import { deactivateActiveTokens } from "./tokensService"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
 type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"]

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../../../../_lib/authContext"
 import {
   ForbiddenError,
@@ -15,10 +15,10 @@ import {
 } from "../../../../../../_services/routineSessionsService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     sessionId: string
     taskId: string
-  }
+  }>
 }
 
 export async function POST(
@@ -26,15 +26,17 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
-    const sessionId = ensureUuid(context.params.sessionId, "sessionId")
-    const taskId = ensureUuid(context.params.taskId, "taskId")
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
+    const { sessionId } = await context.params
+    const sessionIdValidated = ensureUuid(sessionId, "sessionId")
+    const { taskId } = await context.params
+    const taskIdValidated = ensureUuid(taskId, "taskId")
 
     const payload = await readJsonBody(request)
     const command = parseTaskCompletionPayload(payload)
-
-    const supabase = createSupabaseClient()
-    const session = await getSessionDetails(supabase, sessionId, {
+    const session = await getSessionDetails(supabase, sessionIdValidated, {
       includeTasks: false,
       includePerformance: false
     })
@@ -58,8 +60,8 @@ export async function POST(
 
     const result = await completeTaskForSession(
       supabase,
-      sessionId,
-      taskId,
+      sessionIdValidated,
+      taskIdValidated,
       command
     )
 

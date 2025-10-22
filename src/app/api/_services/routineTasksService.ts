@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type {
   RoutineTaskCreateCommand,
@@ -14,8 +13,9 @@ import {
   NotFoundError,
   ValidationError
 } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 type RoutineTaskRow = Database["public"]["Tables"]["routine_tasks"]["Row"]
 type RoutineTaskInsert = Database["public"]["Tables"]["routine_tasks"]["Insert"]

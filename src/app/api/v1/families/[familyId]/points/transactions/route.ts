@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertFamilyAccess,
   assertParentOrAdmin,
@@ -19,9 +19,9 @@ import {
 import { ensureProfileInFamily } from "../../../../../_services/profilesService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     familyId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -29,22 +29,23 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const familyId = ensureUuid(context.params.familyId, "familyId")
-    assertFamilyAccess(authContext, familyId)
+    const { familyId } = await context.params
+    const familyIdValidated = ensureUuid(familyId, "familyId")
+    assertFamilyAccess(authContext, familyIdValidated)
 
     const query = parseTransactionsQuery(request.nextUrl.searchParams)
     const offset = (query.page - 1) * query.pageSize
-
-    const supabase = createSupabaseClient()
     if (query.childProfileId) {
-      await ensureProfileInFamily(supabase, query.childProfileId, familyId)
+      await ensureProfileInFamily(supabase, query.childProfileId, familyIdValidated)
     }
 
     const transactions = await listPointTransactions(supabase, {
-      familyId,
+      familyIdValidated,
       childProfileId: query.childProfileId,
       transactionType: query.transactionType,
       from: query.from ? `${query.from}T00:00:00Z` : undefined,
@@ -66,21 +67,22 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const familyId = ensureUuid(context.params.familyId, "familyId")
-    assertFamilyAccess(authContext, familyId)
+    const { familyId } = await context.params
+    const familyIdValidated = ensureUuid(familyId, "familyId")
+    assertFamilyAccess(authContext, familyIdValidated)
 
     const payload = await readJsonBody(request)
     const command = parseManualTransactionPayload(payload)
-
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, command.profileId, familyId)
+    await ensureProfileInFamily(supabase, command.profileId, familyIdValidated)
 
     const result = await createManualPointTransaction(
       supabase,
-      familyId,
+      familyIdValidated,
       command
     )
 

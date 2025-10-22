@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../_lib/authContext"
 import {
   ForbiddenError,
@@ -10,9 +10,9 @@ import { ensureProfileInFamily } from "../../../_services/profilesService"
 import { getSessionDetails } from "../../../_services/routineSessionsService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     sessionId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -20,13 +20,16 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const sessionId = ensureUuid(context.params.sessionId, "sessionId")
+    const { sessionId } = await context.params
+    const sessionIdValidated = ensureUuid(sessionId, "sessionId")
     const includeTasks = parseBoolean(
       request.nextUrl.searchParams.get("includeTasks"),
       true
@@ -35,9 +38,7 @@ export async function GET(
       request.nextUrl.searchParams.get("includePerformance"),
       true
     )
-
-    const supabase = createSupabaseClient()
-    const details = await getSessionDetails(supabase, sessionId, {
+    const details = await getSessionDetails(supabase, sessionIdValidated, {
       includeTasks,
       includePerformance
     })

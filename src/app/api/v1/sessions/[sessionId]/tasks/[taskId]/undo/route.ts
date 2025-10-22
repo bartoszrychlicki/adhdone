@@ -1,22 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../../../_lib/supabase"
-import { requireAuthContext } from "../../../../../../../_lib/authContext"
+import { createSupabaseServerClient } from "@/lib/supabase"
+import { requireAuthContext } from "../../../../../../_lib/authContext"
 import {
   ForbiddenError,
   handleRouteError
-} from "../../../../../../../_lib/errors"
-import { ensureUuid } from "../../../../../../../_lib/validation"
-import { ensureProfileInFamily } from "../../../../../../../_services/profilesService"
+} from "../../../../../../_lib/errors"
+import { ensureUuid } from "../../../../../../_lib/validation"
+import { ensureProfileInFamily } from "../../../../../../_services/profilesService"
 import {
   getSessionDetails,
   undoTaskCompletion
-} from "../../../../../../../_services/routineSessionsService"
+} from "../../../../../../_services/routineSessionsService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     sessionId: string
     taskId: string
-  }
+  }>
 }
 
 export async function POST(
@@ -24,16 +24,17 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
-    const sessionId = ensureUuid(context.params.sessionId, "sessionId")
-    const completionId = ensureUuid(context.params.taskId, "taskCompletionId")
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
+    const { sessionId, taskId } = await context.params
+    const sessionIdValidated = ensureUuid(sessionId, "sessionId")
+    const completionId = ensureUuid(taskId, "taskCompletionId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
-
-    const supabase = createSupabaseClient()
-    const session = await getSessionDetails(supabase, sessionId, {
+    const session = await getSessionDetails(supabase, sessionIdValidated, {
       includeTasks: false,
       includePerformance: false
     })
@@ -48,7 +49,7 @@ export async function POST(
       throw new ForbiddenError("Only parents can undo task completions")
     }
 
-    await undoTaskCompletion(supabase, sessionId, completionId)
+    await undoTaskCompletion(supabase, sessionIdValidated, completionId)
 
     return NextResponse.json(
       { message: "Task completion reverted" },

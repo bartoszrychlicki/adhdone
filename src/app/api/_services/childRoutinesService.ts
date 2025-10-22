@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/db/database.types"
 import type {
   RoutineChildAssignmentsResponseDto,
   RoutineChildAssignmentDto,
@@ -8,8 +6,9 @@ import type {
   RoutineChildrenReorderResultDto
 } from "@/types"
 import { mapSupabaseError, ValidationError } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 export async function listChildAssignments(
   client: Client,

@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
@@ -15,14 +15,14 @@ import {
 } from "../../../_services/rewardsService"
 
 async function ensureRewardBelongsToFamily(
-  rewardId: string,
+  rewardIdValidated: string,
   familyId: string
 ): Promise<void> {
-  const supabase = createSupabaseClient()
+  const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase
     .from("rewards")
     .select("family_id")
-    .eq("id", rewardId)
+    .eq("id", rewardIdValidated)
     .maybeSingle()
 
   if (error) {
@@ -35,9 +35,9 @@ async function ensureRewardBelongsToFamily(
 }
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     rewardId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -45,18 +45,20 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const rewardId = ensureUuid(context.params.rewardId, "rewardId")
+    const { rewardId } = await context.params
+    const rewardIdValidated = ensureUuid(rewardId, "rewardId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    await ensureRewardBelongsToFamily(rewardId, familyId)
-    const supabase = createSupabaseClient()
-    const details = await getRewardDetails(supabase, rewardId)
+    await ensureRewardBelongsToFamily(rewardIdValidated, familyId)
+    const details = await getRewardDetails(supabase, rewardIdValidated)
 
     return NextResponse.json(details, { status: 200 })
   } catch (error) {
@@ -69,22 +71,23 @@ export async function PATCH(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const rewardId = ensureUuid(context.params.rewardId, "rewardId")
+    const { rewardId } = await context.params
+    const rewardIdValidated = ensureUuid(rewardId, "rewardId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    await ensureRewardBelongsToFamily(rewardId, familyId)
+    await ensureRewardBelongsToFamily(rewardIdValidated, familyId)
 
     const payload = await readJsonBody(request)
     const command = parseUpdateRewardPayload(payload)
-
-    const supabase = createSupabaseClient()
-    const reward = await updateReward(supabase, rewardId, command)
+    const reward = await updateReward(supabase, rewardIdValidated, command)
 
     return NextResponse.json(reward, { status: 200 })
   } catch (error) {
@@ -97,18 +100,20 @@ export async function DELETE(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const rewardId = ensureUuid(context.params.rewardId, "rewardId")
+    const { rewardId } = await context.params
+    const rewardIdValidated = ensureUuid(rewardId, "rewardId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    await ensureRewardBelongsToFamily(rewardId, familyId)
-    const supabase = createSupabaseClient()
-    const result = await archiveReward(supabase, rewardId)
+    await ensureRewardBelongsToFamily(rewardIdValidated, familyId)
+    const result = await archiveReward(supabase, rewardIdValidated)
 
     return NextResponse.json(result, { status: 200 })
   } catch (error) {

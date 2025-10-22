@@ -1,9 +1,9 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type { FamilyDto, FamilyUpdateCommand } from "@/types"
 import { mapSupabaseError, NotFoundError } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 type FamilyRow = Database["public"]["Tables"]["families"]["Row"]
 

@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { addDays } from "date-fns"
-import { createSupabaseClient } from "../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertFamilyAccess,
   assertParentOrAdmin,
@@ -12,9 +12,9 @@ import { parseFamilyProgressQuery } from "../../../../_validators/progress"
 import { getDailyFamilyProgress } from "../../../../_services/familyProgressService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     familyId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -22,18 +22,20 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const familyId = ensureUuid(context.params.familyId, "familyId")
-    assertFamilyAccess(authContext, familyId)
+    const { familyId } = await context.params
+    const familyIdValidated = ensureUuid(familyId, "familyId")
+    assertFamilyAccess(authContext, familyIdValidated)
 
     const query = parseFamilyProgressQuery(request.nextUrl.searchParams)
-    const supabase = createSupabaseClient()
 
     const current = await getDailyFamilyProgress(
       supabase,
-      familyId,
+      familyIdValidated,
       query.date
     )
 
@@ -44,7 +46,7 @@ export async function GET(
     const previousDate = addDays(new Date(`${query.date}T00:00:00Z`), -1)
     const previousSummary = await getDailyFamilyProgress(
       supabase,
-      familyId,
+      familyIdValidated,
       previousDate.toISOString().slice(0, 10)
     )
 

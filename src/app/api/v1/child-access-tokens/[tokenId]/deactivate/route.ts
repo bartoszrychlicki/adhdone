@@ -1,23 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
-} from "../../../../../_lib/authContext"
+} from "../../../../_lib/authContext"
 import {
   handleRouteError,
   ForbiddenError,
   mapSupabaseError
-} from "../../../../../_lib/errors"
-import { ensureUuid } from "../../../../../_lib/validation"
-import { deactivateToken } from "../../../../../_services/tokensService"
-import { ensureProfileInFamily } from "../../../../../_services/profilesService"
-import { mapSupabaseError } from "../../../../../_lib/errors"
+} from "../../../../_lib/errors"
+import { ensureUuid } from "../../../../_lib/validation"
+import { deactivateToken } from "../../../../_services/tokensService"
+import { ensureProfileInFamily } from "../../../../_services/profilesService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     tokenId: string
-  }
+  }>
 }
 
 export async function POST(
@@ -25,16 +24,17 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const tokenId = ensureUuid(context.params.tokenId, "tokenId")
-    const supabase = createSupabaseClient()
+    const { tokenId } = await context.params
+    const tokenIdValidated = ensureUuid(tokenId, "tokenId")
 
     const { data, error } = await supabase
       .from("child_access_tokens")
       .select("profile_id")
-      .eq("id", tokenId)
+      .eq("id", tokenIdValidated)
       .maybeSingle()
 
     if (error) {
@@ -50,7 +50,7 @@ export async function POST(
     const result = await deactivateToken(
       supabase,
       data.profile_id,
-      tokenId,
+      tokenIdValidated,
       authContext.profileId
     )
 

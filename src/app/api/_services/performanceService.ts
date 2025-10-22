@@ -1,12 +1,12 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type {
   RoutinePerformanceListResponseDto,
   RoutinePerformanceStatDto
 } from "@/types"
 import { mapSupabaseError } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 type PerformanceRow = Database["public"]["Tables"]["routine_performance_stats"]["Row"]
 

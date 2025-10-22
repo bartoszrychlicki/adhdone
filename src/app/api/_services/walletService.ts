@@ -1,13 +1,12 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/db/database.types"
 import type {
   ChildWalletDto,
   ChildWalletRecentTransactionDto,
   RewardPendingRedemptionDto
 } from "@/types"
 import { mapSupabaseError } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 export async function getChildWallet(
   client: Client,

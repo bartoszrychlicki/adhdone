@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
@@ -20,9 +20,9 @@ import {
 } from "../../../_services/routineTasksService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     taskId: string
-  }
+  }>
 }
 
 export async function PATCH(
@@ -30,22 +30,23 @@ export async function PATCH(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const taskId = ensureUuid(context.params.taskId, "taskId")
+    const { taskId } = await context.params
+    const taskIdValidated = ensureUuid(taskId, "taskId")
     const payload = await readJsonBody(request)
     const command = parseTaskUpdatePayload(payload)
-
-    const supabase = createSupabaseClient()
-    const taskRow = await getRoutineTaskById(supabase, taskId)
+    const taskRow = await getRoutineTaskById(supabase, taskIdValidated)
     await ensureRoutineInFamily(supabase, taskRow.routine_id, authContext.familyId)
 
-    const task = await updateRoutineTask(supabase, taskId, command)
+    const task = await updateRoutineTask(supabase, taskIdValidated, command)
     return NextResponse.json(task, { status: 200 })
   } catch (error) {
     return handleRouteError(error)

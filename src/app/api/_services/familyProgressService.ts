@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type {
   FamilyProgressChildSummaryDto,
@@ -7,8 +6,9 @@ import type {
   FamilyProgressSummaryDto
 } from "@/types"
 import { mapSupabaseError } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 async function fetchFamilyRoutineNames(
   client: Client,

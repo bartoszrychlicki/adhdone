@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../_lib/authContext"
 import { ForbiddenError, handleRouteError } from "../../../_lib/errors"
 import { readJsonBody } from "../../../_lib/request"
@@ -7,12 +7,12 @@ import { updateOnboardingState, getOnboardingState } from "../../../_services/on
 
 export async function GET(): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const supabase = createSupabaseClient()
     const state = await getOnboardingState(
       supabase,
       authContext.profileId,
@@ -27,13 +27,13 @@ export async function GET(): Promise<Response> {
 
 export async function POST(request: NextRequest): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
     const payload = await readJsonBody(request)
-    const supabase = createSupabaseClient()
     const state = await updateOnboardingState(
       supabase,
       authContext.profileId,

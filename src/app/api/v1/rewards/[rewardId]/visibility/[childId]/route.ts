@@ -1,25 +1,25 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../../_lib/supabase"
-import { assertParentOrAdmin, requireAuthContext } from "../../../../../../_lib/authContext"
-import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../../../../_lib/errors"
-import { ensureUuid } from "../../../../../../_lib/validation"
-import { readJsonBody } from "../../../../../../_lib/request"
-import { parseVisibilityPayload } from "../../../../../../_validators/reward"
+import { createSupabaseServerClient } from "@/lib/supabase"
+import { assertParentOrAdmin, requireAuthContext } from "../../../../../_lib/authContext"
+import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../../../_lib/errors"
+import { ensureUuid } from "../../../../../_lib/validation"
+import { readJsonBody } from "../../../../../_lib/request"
+import { parseVisibilityPayload } from "../../../../../_validators/reward"
 import {
   deleteRewardVisibility,
   upsertRewardVisibility
-} from "../../../../../../_services/rewardVisibilityService"
-import { ensureProfileInFamily } from "../../../../../../_services/profilesService"
+} from "../../../../../_services/rewardVisibilityService"
+import { ensureProfileInFamily } from "../../../../../_services/profilesService"
 
 async function ensureRewardFamily(
-  rewardId: string,
+  rewardIdValidated: string,
   familyId: string
 ): Promise<void> {
-  const supabase = createSupabaseClient()
+  const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase
     .from("rewards")
     .select("family_id")
-    .eq("id", rewardId)
+    .eq("id", rewardIdValidated)
     .maybeSingle()
 
   if (error) {
@@ -32,10 +32,10 @@ async function ensureRewardFamily(
 }
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     rewardId: string
     childId: string
-  }
+  }>
 }
 
 export async function PUT(
@@ -43,27 +43,30 @@ export async function PUT(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const rewardId = ensureUuid(context.params.rewardId, "rewardId")
-    const childId = ensureUuid(context.params.childId, "childId")
+    const { rewardId } = await context.params
+    const rewardIdValidated = ensureUuid(rewardId, "rewardId")
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    await ensureRewardFamily(rewardId, familyId)
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, childId, familyId)
+    await ensureRewardFamily(rewardIdValidated, familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, familyId)
 
     const payload = await readJsonBody(request)
     const command = parseVisibilityPayload(payload)
 
     const visibility = await upsertRewardVisibility(
       supabase,
-      rewardId,
-      childId,
+      rewardIdValidated,
+      childIdValidated,
       command
     )
 
@@ -78,21 +81,24 @@ export async function DELETE(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const rewardId = ensureUuid(context.params.rewardId, "rewardId")
-    const childId = ensureUuid(context.params.childId, "childId")
+    const { rewardId } = await context.params
+    const rewardIdValidated = ensureUuid(rewardId, "rewardId")
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    await ensureRewardFamily(rewardId, familyId)
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, childId, familyId)
+    await ensureRewardFamily(rewardIdValidated, familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, familyId)
 
-    const result = await deleteRewardVisibility(supabase, rewardId, childId)
+    const result = await deleteRewardVisibility(supabase, rewardIdValidated, childIdValidated)
     return NextResponse.json(result, { status: 200 })
   } catch (error) {
     return handleRouteError(error)

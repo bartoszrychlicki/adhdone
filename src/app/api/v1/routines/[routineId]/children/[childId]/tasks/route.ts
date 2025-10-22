@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
@@ -25,10 +25,10 @@ import {
 import { ensureProfileInFamily } from "../../../../../../_services/profilesService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     routineId: string
     childId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -36,23 +36,25 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const routineId = ensureUuid(context.params.routineId, "routineId")
-    const childId = ensureUuid(context.params.childId, "childId")
-
-    const supabase = createSupabaseClient()
-    await ensureRoutineInFamily(supabase, routineId, authContext.familyId)
-    await ensureProfileInFamily(supabase, childId, authContext.familyId)
-    await assertChildAssignedToRoutine(supabase, routineId, childId)
+    const { routineId } = await context.params
+    const routineIdValidated = ensureUuid(routineId, "routineId")
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
+    await ensureRoutineInFamily(supabase, routineIdValidated, authContext.familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
+    await assertChildAssignedToRoutine(supabase, routineIdValidated, childIdValidated)
 
     const query = parseTaskListQuery(request.nextUrl.searchParams)
-    const tasks = await listRoutineTasks(supabase, routineId, childId, {
+    const tasks = await listRoutineTasks(supabase, routineIdValidated, childIdValidated, {
       includeInactive: query.includeInactive,
       sort: query.sort,
       order: query.order
@@ -69,25 +71,27 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const routineId = ensureUuid(context.params.routineId, "routineId")
-    const childId = ensureUuid(context.params.childId, "childId")
+    const { routineId } = await context.params
+    const routineIdValidated = ensureUuid(routineId, "routineId")
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
 
     const payload = await readJsonBody(request)
     const command = parseTaskCreatePayload(payload)
+    await ensureRoutineInFamily(supabase, routineIdValidated, authContext.familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
+    await assertChildAssignedToRoutine(supabase, routineIdValidated, childIdValidated)
 
-    const supabase = createSupabaseClient()
-    await ensureRoutineInFamily(supabase, routineId, authContext.familyId)
-    await ensureProfileInFamily(supabase, childId, authContext.familyId)
-    await assertChildAssignedToRoutine(supabase, routineId, childId)
-
-    const task = await createRoutineTask(supabase, routineId, childId, command)
+    const task = await createRoutineTask(supabase, routineIdValidated, childIdValidated, command)
     return NextResponse.json(task, { status: 201 })
   } catch (error) {
     return handleRouteError(error)

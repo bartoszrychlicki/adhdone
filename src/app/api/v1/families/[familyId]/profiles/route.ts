@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertFamilyAccess,
   assertParentOrAdmin,
@@ -18,9 +18,9 @@ import {
 import { readJsonBody } from "../../../../_lib/request"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     familyId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -28,18 +28,19 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const familyId = ensureUuid(context.params.familyId, "familyId")
-    assertFamilyAccess(authContext, familyId)
+    const { familyId } = await context.params
+    const familyIdValidated = ensureUuid(familyId, "familyId")
+    assertFamilyAccess(authContext, familyIdValidated)
 
     const query = parseProfilesListQuery(request.nextUrl.searchParams)
     const offset = (query.page - 1) * query.pageSize
 
-    const supabase = createSupabaseClient()
     const result = await listProfiles(supabase, {
-      familyId,
+      familyId: familyIdValidated,
       role: query.role,
       includeDeleted: query.includeDeleted,
       limit: query.pageSize,
@@ -59,17 +60,18 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const familyId = ensureUuid(context.params.familyId, "familyId")
-    assertFamilyAccess(authContext, familyId)
+    const { familyId } = await context.params
+    const familyIdValidated = ensureUuid(familyId, "familyId")
+    assertFamilyAccess(authContext, familyIdValidated)
 
     const payload = await readJsonBody(request)
     const command = parseCreateChildProfilePayload(payload)
 
-    const supabase = createSupabaseClient()
-    const profile = await createChildProfile(supabase, familyId, command)
+    const profile = await createChildProfile(supabase, familyIdValidated, command)
 
     return NextResponse.json(profile, { status: 201 })
   } catch (error) {

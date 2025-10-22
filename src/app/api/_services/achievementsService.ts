@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type {
   AchievementDto,
@@ -15,8 +14,9 @@ import {
   NotFoundError,
   ValidationError
 } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 type AchievementRow = Database["public"]["Tables"]["achievements"]["Row"]
 
 function mapAchievement(row: AchievementRow): AchievementDto {

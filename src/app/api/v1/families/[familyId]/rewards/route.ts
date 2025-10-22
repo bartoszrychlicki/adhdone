@@ -1,27 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertFamilyAccess,
   assertParentOrAdmin,
   requireAuthContext
-} from "../../../../../_lib/authContext"
-import { handleRouteError } from "../../../../../_lib/errors"
-import { ensureUuid } from "../../../../../_lib/validation"
-import { readJsonBody } from "../../../../../_lib/request"
+} from "../../../../_lib/authContext"
+import { handleRouteError } from "../../../../_lib/errors"
+import { ensureUuid } from "../../../../_lib/validation"
+import { readJsonBody } from "../../../../_lib/request"
 import {
   parseCreateRewardPayload,
   parseRewardListQuery
-} from "../../../../../_validators/reward"
+} from "../../../../_validators/reward"
 import {
   createReward,
   listRewards
-} from "../../../../../_services/rewardsService"
-import { ensureProfileInFamily } from "../../../../../_services/profilesService"
+} from "../../../../_services/rewardsService"
+import { ensureProfileInFamily } from "../../../../_services/profilesService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     familyId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -29,22 +29,23 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const familyId = ensureUuid(context.params.familyId, "familyId")
-    assertFamilyAccess(authContext, familyId)
+    const { familyId } = await context.params
+    const familyIdValidated = ensureUuid(familyId, "familyId")
+    assertFamilyAccess(authContext, familyIdValidated)
 
     const query = parseRewardListQuery(request.nextUrl.searchParams)
     const offset = (query.page - 1) * query.pageSize
-
-    const supabase = createSupabaseClient()
     if (query.childProfileId) {
-      await ensureProfileInFamily(supabase, query.childProfileId, familyId)
+      await ensureProfileInFamily(supabase, query.childProfileId, familyIdValidated)
     }
 
     const rewards = await listRewards(supabase, {
-      familyId,
+      familyIdValidated,
       includeDeleted: query.includeDeleted,
       childProfileId: query.childProfileId,
       limit: query.pageSize,
@@ -64,17 +65,18 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const familyId = ensureUuid(context.params.familyId, "familyId")
-    assertFamilyAccess(authContext, familyId)
+    const { familyId } = await context.params
+    const familyIdValidated = ensureUuid(familyId, "familyId")
+    assertFamilyAccess(authContext, familyIdValidated)
 
     const payload = await readJsonBody(request)
     const command = parseCreateRewardPayload(payload)
-
-    const supabase = createSupabaseClient()
-    const reward = await createReward(supabase, familyId, command)
+    const reward = await createReward(supabase, familyIdValidated, command)
 
     return NextResponse.json(reward, { status: 201 })
   } catch (error) {

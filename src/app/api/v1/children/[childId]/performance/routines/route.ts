@@ -1,18 +1,18 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../../_lib/supabase"
-import { requireAuthContext } from "../../../../../../_lib/authContext"
+import { createSupabaseServerClient } from "@/lib/supabase"
+import { requireAuthContext } from "../../../../../_lib/authContext"
 import {
   ForbiddenError,
   handleRouteError
-} from "../../../../../../_lib/errors"
-import { ensureUuid } from "../../../../../../_lib/validation"
-import { ensureProfileInFamily } from "../../../../../../_services/profilesService"
-import { listRoutinePerformance } from "../../../../../../_services/performanceService"
+} from "../../../../../_lib/errors"
+import { ensureUuid } from "../../../../../_lib/validation"
+import { ensureProfileInFamily } from "../../../../../_services/profilesService"
+import { listRoutinePerformance } from "../../../../../_services/performanceService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     childId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -20,22 +20,23 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
-    const childId = ensureUuid(context.params.childId, "childId")
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    if (authContext.role === "child" && authContext.profileId !== childId) {
+    if (authContext.role === "child" && authContext.profileId !== childIdValidated) {
       throw new ForbiddenError("Children can only view their own stats")
     }
 
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, childId, authContext.familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
 
     const routineId = request.nextUrl.searchParams.get("routineId") ?? undefined
-    const stats = await listRoutinePerformance(supabase, childId, routineId)
+    const stats = await listRoutinePerformance(supabase, childIdValidated, routineId)
 
     return NextResponse.json(stats, { status: 200 })
   } catch (error) {

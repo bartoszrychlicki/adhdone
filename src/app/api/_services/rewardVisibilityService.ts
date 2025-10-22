@@ -1,5 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js"
-import type { Database } from "@/db/database.types"
 import type {
   RewardVisibilityDeleteResultDto,
   RewardVisibilityDto,
@@ -7,8 +5,9 @@ import type {
   UpsertRewardVisibilityCommand
 } from "@/types"
 import { mapSupabaseError, NotFoundError } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 export async function listRewardVisibility(
   client: Client,

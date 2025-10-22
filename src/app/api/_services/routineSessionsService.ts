@@ -1,5 +1,4 @@
 import { addMinutes } from "date-fns"
-import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import type {
   CompleteRoutineSessionCommand,
@@ -21,8 +20,9 @@ import {
   NotFoundError,
   ValidationError
 } from "../_lib/errors"
+import type { AppSupabaseClient } from "../_lib/types"
 
-type Client = SupabaseClient<Database>
+type Client = AppSupabaseClient
 
 type RoutineSessionRow = Database["public"]["Tables"]["routine_sessions"]["Row"]
 type RoutineSessionInsert = Database["public"]["Tables"]["routine_sessions"]["Insert"]

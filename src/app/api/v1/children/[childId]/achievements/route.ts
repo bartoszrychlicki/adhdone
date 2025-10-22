@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../../_lib/authContext"
 import { ForbiddenError, handleRouteError } from "../../../../_lib/errors"
 import { ensureUuid } from "../../../../_lib/validation"
@@ -12,9 +12,9 @@ import {
 import { ensureProfileInFamily } from "../../../../_services/profilesService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     childId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -22,21 +22,22 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
-    const childId = ensureUuid(context.params.childId, "childId")
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    if (authContext.role === "child" && authContext.profileId !== childId) {
+    if (authContext.role === "child" && authContext.profileId !== childIdValidated) {
       throw new ForbiddenError("Children can only view their own achievements")
     }
 
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, childId, authContext.familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
 
-    const achievements = await listChildAchievements(supabase, childId)
+    const achievements = await listChildAchievements(supabase, childIdValidated)
     return NextResponse.json(achievements, { status: 200 })
   } catch (error) {
     return handleRouteError(error)
@@ -48,8 +49,10 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
-    const childId = ensureUuid(context.params.childId, "childId")
+    const supabase = await createSupabaseServerClient()
+    const authContext = await requireAuthContext(supabase)
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
@@ -59,13 +62,12 @@ export async function POST(
       throw new ForbiddenError("Children cannot award achievements")
     }
 
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, childId, authContext.familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
 
     const payload = await readJsonBody(request)
     const command = parseAwardAchievementPayload(payload)
 
-    const result = await awardAchievement(supabase, childId, command)
+    const result = await awardAchievement(supabase, childIdValidated, command)
     return NextResponse.json(result, { status: 201 })
   } catch (error) {
     return handleRouteError(error)

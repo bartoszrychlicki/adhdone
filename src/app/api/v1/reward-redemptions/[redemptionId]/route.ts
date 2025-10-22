@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import { assertParentOrAdmin, requireAuthContext } from "../../../_lib/authContext"
 import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../_lib/errors"
 import { ensureUuid } from "../../../_lib/validation"
@@ -9,14 +9,14 @@ import { ensureProfileInFamily } from "../../../_services/profilesService"
 import { updateRewardRedemption } from "../../../_services/rewardRedemptionService"
 
 async function ensureRedemptionFamily(
-  redemptionId: string,
+  redemptionIdValidated: string,
   familyId: string
 ): Promise<string> {
-  const supabase = createSupabaseClient()
+  const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase
     .from("reward_redemptions")
     .select("child_profile_id, rewards:rewards!inner(family_id)")
-    .eq("id", redemptionId)
+    .eq("id", redemptionIdValidated)
     .maybeSingle()
 
   if (error) {
@@ -36,9 +36,9 @@ async function ensureRedemptionFamily(
 }
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     redemptionId: string
-  }
+  }>
 }
 
 export async function PATCH(
@@ -46,17 +46,19 @@ export async function PATCH(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const redemptionId = ensureUuid(context.params.redemptionId, "redemptionId")
+    const { redemptionId } = await context.params
+    const redemptionIdValidated = ensureUuid(redemptionId, "redemptionId")
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const childProfileId = await ensureRedemptionFamily(redemptionId, familyId)
-    const supabase = createSupabaseClient()
+    const childProfileId = await ensureRedemptionFamily(redemptionIdValidated, familyId)
     await ensureProfileInFamily(supabase, childProfileId, familyId)
 
     const payload = await readJsonBody(request)
@@ -64,7 +66,7 @@ export async function PATCH(
 
     const redemption = await updateRewardRedemption(
       supabase,
-      redemptionId,
+      redemptionIdValidated,
       command
     )
 

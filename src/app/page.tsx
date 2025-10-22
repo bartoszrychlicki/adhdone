@@ -1,103 +1,124 @@
-import Image from "next/image";
+import { redirect } from "next/navigation"
+import Link from "next/link"
+import { ArrowRight, Clock3, HeartHandshake } from "lucide-react"
 
-export default function Home() {
+import { NetworkStatusBanner } from "@/components/network-status-banner"
+import { RoleCard } from "@/components/landing/role-card"
+import { SecurityCallout } from "@/components/landing/security-callout"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { getActiveProfile } from "@/lib/auth/get-active-profile"
+
+export default async function Home() {
+  const activeProfile = await getActiveProfile()
+
+  if (activeProfile?.role === "parent" || activeProfile?.role === "admin") {
+    redirect("/parent/dashboard")
+  }
+
+  if (activeProfile?.role === "child") {
+    redirect("/child/home")
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="relative isolate min-h-screen overflow-hidden bg-slate-950 text-white">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.25),transparent_60%),radial-gradient(circle_at_bottom_right,rgba(192,132,252,0.25),transparent_55%)]" />
+      <main className="relative mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-6 px-6 pb-16 pt-12 sm:gap-10 sm:px-10 lg:px-12">
+        <NetworkStatusBanner />
+        <section className="mt-6 flex flex-col gap-6 rounded-3xl border border-slate-800/50 bg-slate-900/40 p-8 backdrop-blur-md sm:gap-8 sm:p-10">
+          <Badge
+            variant="outline"
+            className="w-fit border-slate-700/60 bg-slate-900/60 text-xs uppercase tracking-wide text-slate-200"
+          >
+            MVP • Dziennik Rutyn Eryka
+          </Badge>
+          <header className="space-y-4 sm:space-y-6">
+            <h1 className="max-w-2xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
+              Wybierz, w jaki sposób chcesz rozpocząć dzień z Dziennikiem Rutyn
+            </h1>
+            <p className="max-w-2xl text-pretty text-base text-slate-200 sm:text-lg">
+              Dla rodzica przygotowaliśmy panel do konfiguracji rutyn i nagród. Interfejs dziecka prowadzi przez
+              zadania krok po kroku, motywując do szybkiego działania i śledząc punkty.
+            </p>
+          </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+          <div className="grid gap-6 md:grid-cols-2">
+            <RoleCard
+              role="parent"
+              href="/auth/parent"
+              title="Jestem rodzicem"
+              description="Zarządzaj rutynami, nagrodami i postępami Eryka w jednym miejscu."
+              highlight="Pełna kontrola"
+              features={[
+                "Panel dzienny z podsumowaniem dziś i wczoraj",
+                "Kopiowanie gotowych zadań z szablonów",
+                "Konfiguracja katalogu nagród z obrazami",
+              ]}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+            <RoleCard
+              role="child"
+              href="/auth/child"
+              title="Jestem Erykiem"
+              description="Wejdź do grywalizowanego interfejsu rutyn i zdobywaj punkty za zadania."
+              highlight="Tryb przygody"
+              features={[
+                "Pełna lista zadań z podświetleniem bieżącego kroku",
+                "Timer z bonusem za rekord",
+                "Sklep nagród z aktualnym saldem punktów",
+              ]}
+            />
+          </div>
+
+          <Card className="border-slate-800/60 bg-slate-900/40 text-slate-100 backdrop-blur">
+            <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="rounded-full bg-teal-500/20 p-2 text-teal-200">
+                  <HeartHandshake className="size-5" aria-hidden />
+                </span>
+                <div>
+                  <p className="text-sm font-medium uppercase tracking-wide text-teal-200/90">
+                    Potrzebujesz zaproszenia
+                  </p>
+                  <p className="text-base text-slate-200">
+                    Aby korzystać z aplikacji, rodzic musi dodać Cię do swojej rodziny. Po zalogowaniu otrzymasz
+                    indywidualny PIN lub link.
+                  </p>
+                </div>
+              </div>
+              <Button asChild variant="outline" className="w-full border-slate-700/60 text-slate-100 sm:w-fit">
+                <Link href="/auth/parent">
+                  Dowiedz się, jak rozpocząć
+                  <ArrowRight className="ml-2 size-4" aria-hidden />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <SecurityCallout />
+
+          <aside className="grid gap-4 rounded-2xl border border-slate-800/60 bg-slate-900/40 p-6 text-sm text-slate-200 sm:grid-cols-2">
+            <div className="flex items-start gap-3">
+              <span className="rounded-full bg-indigo-500/20 p-2 text-indigo-200">
+                <Clock3 className="size-4" aria-hidden />
+              </span>
+              <p>
+                Kolejna rutyna rozpocznie się w wybranym przez Ciebie oknie czasowym. Dziecko zobaczy licznik i
+                otrzyma przypomnienie o zbliżającym się starcie.
+              </p>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="rounded-full bg-violet-500/20 p-2 text-violet-200">
+                <ArrowRight className="size-4" aria-hidden />
+              </span>
+              <p>
+                Po zalogowaniu rodzic automatycznie trafi do panelu, a dziecko do widoku rutyn. Możesz przełączać
+                się między rolami w dowolnym momencie.
+              </p>
+            </div>
+          </aside>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
-  );
+  )
 }

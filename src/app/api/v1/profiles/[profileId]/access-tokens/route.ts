@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
@@ -17,9 +17,9 @@ import {
 import { ensureProfileInFamily } from "../../../../_services/profilesService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     profileId: string
-  }
+  }>
 }
 
 export async function GET(
@@ -27,17 +27,18 @@ export async function GET(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
-    const profileId = ensureUuid(context.params.profileId, "profileId")
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
+    const { profileId } = await context.params
+    const profileIdValidated = ensureUuid(profileId, "profileId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
+    await ensureProfileInFamily(supabase, profileIdValidated, authContext.familyId)
 
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, profileId, authContext.familyId)
-
-    if (authContext.role === "child" && authContext.profileId !== profileId) {
+    if (authContext.role === "child" && authContext.profileId !== profileIdValidated) {
       throw new ForbiddenError("Children can only view their own tokens")
     }
 
@@ -48,7 +49,7 @@ export async function GET(
 
     const tokens = await listChildAccessTokens(
       supabase,
-      profileId,
+      profileIdValidated,
       includeInactive
     )
 
@@ -63,24 +64,25 @@ export async function POST(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
-    const profileId = ensureUuid(context.params.profileId, "profileId")
+    const { profileId } = await context.params
+    const profileIdValidated = ensureUuid(profileId, "profileId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
-
-    const supabase = createSupabaseClient()
-    await ensureProfileInFamily(supabase, profileId, authContext.familyId)
+    await ensureProfileInFamily(supabase, profileIdValidated, authContext.familyId)
 
     const payload = await readJsonBody(request)
     const command = parseCreateChildTokenPayload(payload)
 
     const token = await createChildAccessToken(
       supabase,
-      profileId,
+      profileIdValidated,
       authContext.profileId,
       command
     )

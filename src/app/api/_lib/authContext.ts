@@ -2,6 +2,7 @@ import { headers } from "next/headers"
 import { ForbiddenError, UnauthorizedError, ValidationError } from "./errors"
 import type { Enums } from "@/db/database.types"
 import type { Uuid } from "@/types"
+import type { AppSupabaseClient } from "./types"
 
 type ProfileRole = Enums<"profile_role">
 
@@ -39,21 +40,50 @@ function parseRole(value: string | null): ProfileRole {
   throw new ValidationError("Invalid role in auth context", { role: value })
 }
 
-export function requireAuthContext(): AuthContext {
-  const hdrs = headers()
-  const profileId = parseUuid(hdrs.get("x-debug-profile-id"), "profileId")
+export async function requireAuthContext(
+  supabase: AppSupabaseClient
+): Promise<AuthContext> {
+  const hdrs = await headers()
 
-  if (!profileId) {
+  // Try debug headers first (for testing)
+  const debugProfileId = parseUuid(hdrs.get("x-debug-profile-id"), "profileId")
+  if (debugProfileId) {
+    const debugFamilyId = parseUuid(hdrs.get("x-debug-family-id"), "familyId")
+    const debugRole = parseRole(hdrs.get("x-debug-role"))
+
+    return {
+      profileId: debugProfileId,
+      familyId: debugFamilyId,
+      role: debugRole
+    }
+  }
+
+  // Otherwise, read from Supabase Auth session
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
     throw new UnauthorizedError("Missing authentication context")
   }
 
-  const familyId = parseUuid(hdrs.get("x-debug-family-id"), "familyId")
-  const role = parseRole(hdrs.get("x-debug-role"))
+  // Fetch profile from database
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, family_id, role")
+    .eq("auth_user_id", user.id)
+    .maybeSingle()
+
+  if (profileError) {
+    throw new UnauthorizedError("Failed to load user profile")
+  }
+
+  if (!profile) {
+    throw new UnauthorizedError("User profile not found")
+  }
 
   return {
-    profileId,
-    familyId,
-    role
+    profileId: profile.id,
+    familyId: profile.family_id,
+    role: profile.role
   }
 }
 

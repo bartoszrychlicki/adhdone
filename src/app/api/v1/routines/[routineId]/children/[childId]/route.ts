@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseClient } from "../../../../../_lib/supabase"
+import { createSupabaseServerClient } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
@@ -18,10 +18,10 @@ import {
 import { ensureProfileInFamily } from "../../../../../_services/profilesService"
 
 type RouteParams = {
-  params: {
+  params: Promise<{
     routineId: string
     childId: string
-  }
+  }>
 }
 
 export async function PUT(
@@ -29,27 +29,29 @@ export async function PUT(
   context: RouteParams
 ): Promise<Response> {
   try {
-    const authContext = requireAuthContext()
+    const supabase = await createSupabaseServerClient()
+
+    const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
 
-    const routineId = ensureUuid(context.params.routineId, "routineId")
-    const childId = ensureUuid(context.params.childId, "childId")
+    const { routineId } = await context.params
+    const routineIdValidated = ensureUuid(routineId, "routineId")
+    const { childId } = await context.params
+    const childIdValidated = ensureUuid(childId, "childId")
 
     const payload = await readJsonBody(request)
     const command = parseChildRoutineAssignmentPayload(payload)
-
-    const supabase = createSupabaseClient()
-    await ensureRoutineInFamily(supabase, routineId, authContext.familyId)
-    await ensureProfileInFamily(supabase, childId, authContext.familyId)
+    await ensureRoutineInFamily(supabase, routineIdValidated, authContext.familyId)
+    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
 
     const assignment = await upsertChildRoutine(
       supabase,
-      routineId,
-      childId,
+      routineIdValidated,
+      childIdValidated,
       command
     )
 
