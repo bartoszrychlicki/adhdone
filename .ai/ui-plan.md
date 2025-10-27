@@ -60,6 +60,7 @@
 
 ### Onboarding Krok 3 – Nagrody
 - Ścieżka: `/onboarding/rewards`
+- Status: ✅ Formularz wyboru nagród (szablony + nagroda własna) z akcją zapisującą do Supabase
 - Główny cel: wybór nagród startowych z katalogu szablonów.
 - Kluczowe informacje: karty nagród (nazwa, cena, grafika/placeholder), możliwość dodania własnej nagrody.
 - Kluczowe komponenty: grid kart z checkboxem, formularz „Dodaj własną nagrodę”, toast potwierdzający dodanie.
@@ -83,6 +84,7 @@
 
 ### Zarządzanie Rutynami – Lista
 - Ścieżka: `/parent/routines`
+- Status: ✅ Widok listy z aktywacją/dezaktywacją rutyn i linkiem do szczegółów
 - Główny cel: przegląd rutyn i szybkie akcje edycji.
 - Kluczowe informacje: zestaw rutyn z oknami czasowymi, liczbą zadań, przypisanymi dziećmi.
 - Kluczowe komponenty: tabela, przyciski akcji, filtr po dziecku.
@@ -90,6 +92,7 @@
 
 ### Szczegóły Rutyny
 - Ścieżka: `/parent/routines/[routineId]`
+- Status: ✅ Widok szczegółów z listą zadań (edycja punktów, kolejność) oraz snapshot informacyjny
 - Główny cel: edycja zadań i przypisań danej rutyny.
 - Kluczowe informacje: lista zadań z kolejnością, punktami, statusem; przypisane dzieci.
 - Kluczowe komponenty: drag-and-drop list, edytor zadania, modal dodawania zadań z szablonów.
@@ -97,6 +100,7 @@
 
 ### Konfiguracja Rutyny per Dziecko
 - Ścieżka: `/parent/routines/[routineId]/children/[childId]`
+- Status: ✅ Personalizacja punktów i włączania zadań dla konkretnego dziecka
 - Główny cel: dostosowanie zadań i kolejności dla konkretnego dziecka.
 - Kluczowe informacje: personalizowana lista zadań, opcjonalne wyłączenia, podgląd punktów.
 - Kluczowe komponenty: checklista, input punktów, info o rekordach dziecka.
@@ -104,6 +108,7 @@
 
 ### Katalog Nagród Rodzica
 - Ścieżka: `/parent/rewards`
+- Status: ✅ Widok listy nagród z aktywacją/dezaktywacją i odnośnikiem do kreatora
 - Główny cel: zarządzanie katalogiem nagród.
 - Kluczowe informacje: lista nagród (źródło standard/custom, cena, stan), akcje aktywacji/dezaktywacji.
 - Kluczowe komponenty: grid kart, modal edycji, uploader obrazu.
@@ -111,6 +116,7 @@
 
 ### Profile Dzieci i Tokeny
 - Ścieżka: `/parent/children`
+- Status: ✅ Widok profili dzieci z generowaniem/dezaktywacją tokenów i podglądem QR
 - Główny cel: zarządzanie profilami dzieci i dostępami.
 - Kluczowe informacje: dane profili, status tokenu, liczba nieudanych prób PIN.
 - Kluczowe komponenty: lista kart, przyciski generowania tokenu, QR modal.
@@ -132,6 +138,7 @@
 
 ### Tablica Rutyn Dziecka
 - Ścieżka: `/child/home`
+- Status: ✅ Połączono z Supabase – harmonogram rutyn pobierany na żywo z przypisanych sesji
 - Główny cel: wybór aktywnej rutyny (dziś, zbliżające się, zakończone).
 - Kluczowe informacje: trzy rutyny z oznaczeniem statusu, czas pozostały, nagrody dostępne.
 - Kluczowe komponenty: card-stack, countdown, CTA „Start”.
@@ -139,6 +146,7 @@
 
 ### Aktywna Rutyna
 - Ścieżka: `/child/routines/[routineSessionId]`
+- Status: ✅ Widok korzysta z danych sesji w Supabase i pokazuje aktualne stany zadań
 - Główny cel: prowadzenie dziecka krok po kroku przez zadania.
 - Kluczowe informacje: pełna lista zadań, podświetlenie bieżącego, timer, punkty sesji, offline status.
 - Kluczowe komponenty: SequentialTaskList, Timer, ProgressTracker, komponent kolejki offline.
@@ -146,6 +154,7 @@
 
 ### Ekran Sukcesu Rutyny
 - Ścieżka: `/child/routines/[routineSessionId]/success`
+- Status: ✅ Podsumowanie bazuje na zakończonej sesji oraz statystykach wydajności z Supabase
 - Główny cel: świętowanie ukończenia rutyny i kierowanie do nagród.
 - Kluczowe informacje: czas rutyny, porównanie rekordu, zdobyte odznaki, punkty, komunikat o kolejnej rutynie z godziną i countdown.
 - Kluczowe komponenty: celebratory animation, stats cards, CTA „Zobacz nagrody”, CTA „Wróć do rutyn”.
@@ -153,6 +162,7 @@
 
 ### Sklep z Nagrodami Dziecka
 - Ścieżka: `/child/rewards`
+- Status: ✅ Saldo i lista nagród pobierane z Supabase (katalog rodziny + portfel dziecka)
 - Główny cel: przeglądanie i wymiana punktów na nagrody.
 - Kluczowe informacje: siatka nagród (nazwa, cena, obraz, badge źródła), status dostępności.
 - Kluczowe komponenty: RewardGrid, modal potwierdzenia wymiany, saldo punktów.
@@ -160,6 +170,7 @@
 
 ### Profil i Osiągnięcia Dziecka
 - Ścieżka: `/child/profile`
+- Status: ✅ Profil zasilany danymi Supabase (portfel, osiągnięcia, historia sesji)
 - Główny cel: przegląd zdobytych odznak i statystyk.
 - Kluczowe informacje: galeria odznak, historia rutyn, licznik serii.
 - Kluczowe komponenty: badge gallery, timeline, share modal (opcjonalnie).
