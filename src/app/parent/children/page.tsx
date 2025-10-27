@@ -135,6 +135,9 @@ export default async function ParentChildrenPage() {
                           </Button>
                         </form>
                       ) : null}
+                      <Button asChild size="sm" variant="secondary">
+                        <Link href={`/parent/children/${child.id}/preview`}>Wejdź jako dziecko</Link>
+                      </Button>
                     </div>
                   </div>
                   {qrLink ? (

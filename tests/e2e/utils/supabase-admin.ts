@@ -18,6 +18,13 @@ type ParentAccount = {
   profileId: string
 }
 
+export type ParentAccountFixture = ParentAccount
+
+export type ChildProfileFixture = {
+  id: string
+  displayName: string
+}
+
 function getEnv(name: string): string | undefined {
   const value = process.env[name]
   return typeof value === "string" && value.length > 0 ? value : undefined
@@ -180,4 +187,39 @@ export async function deleteParentAccount(account: ParentAccount): Promise<void>
   await client.from("profiles").delete().eq("family_id", account.familyId)
   await client.from("families").delete().eq("id", account.familyId)
   await client.auth.admin.deleteUser(account.userId)
+}
+
+type CreateChildOptions = {
+  displayName?: string
+}
+
+export async function createChildProfileForFamily(
+  familyId: string,
+  options: CreateChildOptions = {}
+): Promise<ChildProfileFixture> {
+  const client = createAdminClient()
+  const displayName = options.displayName ?? `Eryk ${crypto.randomUUID().slice(0, 4)}`
+
+  const { data, error } = await client
+    .from("profiles")
+    .insert({
+      family_id: familyId,
+      role: "child",
+      display_name: displayName,
+      email: null,
+      settings: {},
+      pin_failed_attempts: 0,
+      pin_lock_expires_at: null,
+    })
+    .select("id, display_name")
+    .maybeSingle()
+
+  if (error || !data) {
+    throw error ?? new Error("Failed to create child profile")
+  }
+
+  return {
+    id: data.id,
+    displayName: data.display_name ?? displayName,
+  }
 }
