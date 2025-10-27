@@ -36,7 +36,7 @@ type RoutineDetails = {
   }>
 }
 
-export default async function RoutineDetailsPage({ params }: { params: { routineId: string } }) {
+export default async function RoutineDetailsPage({ params }: { params: Promise<{ routineId: string }> }) {
   const activeProfile = await getActiveProfile()
 
   if (!activeProfile) {
@@ -47,7 +47,7 @@ export default async function RoutineDetailsPage({ params }: { params: { routine
     throw new Error("Brak przypisanej rodziny.")
   }
 
-  const routineId = params.routineId
+  const { routineId } = await params
 
   const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase

@@ -194,7 +194,7 @@ export async function fetchChildRoutineBoard(
     throw new Error(taskTotalsError.message)
   }
 
-  const taskTotals = new Map<string, number>()
+  const taskTotals = new Map<string, number>();
   (taskTotalsData ?? []).forEach((row) => {
     const typed = row as RoutineTaskRow
     const current = taskTotals.get(typed.routine_id) ?? 0

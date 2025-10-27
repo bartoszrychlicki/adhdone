@@ -145,7 +145,7 @@ export async function listChildAchievements(
     .select(
       `achievement_id, awarded_at, metadata, achievements:achievements!inner(id, code, name, description, icon_url)`
     )
-    .eq("child_profile_id", childProfileId)
+    .eq("profile_id", childProfileId)
 
   if (error) {
     throw mapSupabaseError(error)
@@ -172,7 +172,7 @@ export async function awardAchievement(
   const { data, error } = await client
     .from("user_achievements")
     .insert({
-      child_profile_id: childProfileId,
+      profile_id: childProfileId,
       achievement_id: command.achievementId,
       metadata: command.metadata ?? {},
       awarded_at: new Date().toISOString()
