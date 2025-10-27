@@ -3,6 +3,9 @@
 import { revalidatePath } from "next/cache"
 import { headers, cookies } from "next/headers"
 
+import { createSupabaseServerClient } from "@/lib/supabase"
+import { markOnboardingProgress } from "@/lib/onboarding/progress"
+
 type ActionStatus = "idle" | "success" | "error"
 
 type FamilyFormState = {
@@ -77,6 +80,7 @@ export async function updateFamilyAction(
     }
 
     revalidatePath("/onboarding/family")
+    await markFamilyStep()
     return { status: "success", message: "Dane rodziny zostały zapisane." }
   } catch (error) {
     return {
@@ -89,6 +93,35 @@ export async function updateFamilyAction(
 type ChildFormState = {
   status: ActionStatus
   message?: string
+}
+
+async function markFamilyStep() {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, family_id")
+    .eq("auth_user_id", user.id)
+    .is("deleted_at", null)
+    .maybeSingle()
+
+  if (!profile?.id || !profile.family_id) {
+    return
+  }
+
+  await markOnboardingProgress({
+    profileId: profile.id,
+    familyId: profile.family_id,
+    profileStep: "family",
+    familyStep: "family",
+  })
 }
 
 export async function createChildProfileAction(
@@ -129,6 +162,7 @@ export async function createChildProfileAction(
     }
 
     revalidatePath("/onboarding/family")
+    await markFamilyStep()
     return {
       status: "success",
       message: pin

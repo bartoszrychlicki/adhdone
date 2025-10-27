@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { markOnboardingProgress } from "@/lib/onboarding/progress"
 import { ROUTINE_DEFAULTS, ROUTINE_TEMPLATES, type RoutineType } from "@/data/routine-templates"
 
 const ROUTINE_TYPES: RoutineType[] = ["morning", "afternoon", "evening"]
@@ -254,6 +255,12 @@ export async function saveRoutineSetupAction(
     }
 
     revalidatePath("/onboarding/routines")
+    await markOnboardingProgress({
+      profileId: profile.id,
+      familyId,
+      profileStep: "routines",
+      familyStep: "routines",
+    })
 
     return {
       status: "success",

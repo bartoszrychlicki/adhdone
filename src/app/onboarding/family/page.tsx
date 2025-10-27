@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { createSupabaseServerClient } from "@/lib/supabase"
 import { getActiveProfile } from "@/lib/auth/get-active-profile"
+import { getSupportedTimezones } from "@/lib/timezones"
 
 type FamilyRecord = {
   id: string
@@ -19,14 +20,6 @@ type ChildProfileRecord = {
   id: string
   displayName: string
   createdAt: string
-}
-
-function getTimezones(): string[] {
-  if (typeof Intl.supportedValuesOf === "function") {
-    return Intl.supportedValuesOf("timeZone")
-  }
-
-  return ["Europe/Warsaw", "UTC"]
 }
 
 export default async function OnboardingFamilyPage() {
@@ -75,7 +68,7 @@ export default async function OnboardingFamilyPage() {
       createdAt: row.created_at,
     })) ?? []
 
-  const timezoneOptions = getTimezones()
+  const timezoneOptions = getSupportedTimezones()
 
   return (
     <div className="flex flex-col gap-10 pb-20">
