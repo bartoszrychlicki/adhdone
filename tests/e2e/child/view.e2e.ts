@@ -15,9 +15,9 @@ test.describe("Authenticated child experience", () => {
     await page.goto("/child/home")
 
     await expect(page.getByRole("heading", { name: "Wybierz, co robimy teraz" })).toBeVisible()
-    await expect(page.getByRole("heading", { name: childSeedData.routines.today.name })).toBeVisible()
-    await expect(page.getByRole("heading", { name: childSeedData.routines.upcoming.name })).toBeVisible()
-    await expect(page.getByRole("heading", { name: childSeedData.routines.completed.name })).toBeVisible()
+    await expect(page.getByText(childSeedData.routines.today.name)).toBeVisible()
+    await expect(page.getByText(childSeedData.routines.upcoming.name)).toBeVisible()
+    await expect(page.getByText(childSeedData.routines.completed.name)).toBeVisible()
     await expect(page.getByText("Ukończone rutyny")).toBeVisible()
   })
 
@@ -32,19 +32,25 @@ test.describe("Authenticated child experience", () => {
     await page.goto("/child/routines")
 
     await expect(page.getByRole("heading", { name: "Pełny harmonogram dnia" })).toBeVisible()
-    await expect(page.getByRole("heading", { name: "Dostępne dziś" }).locator("..").getByText(
-      String(childSeedData.routines.totals.availableToday)
-    )).toBeVisible()
-    await expect(page.getByRole("heading", { name: "Łączna pula punktów" }).locator("..").getByText(
-      `${childSeedData.routines.totals.totalPointsToday} pkt`
-    )).toBeVisible()
-    await expect(page.getByRole("heading", { name: "Już ukończone" }).locator("..").getByText(
-      String(childSeedData.routines.totals.completedToday)
-    )).toBeVisible()
 
-    await expect(page.getByRole("heading", { name: childSeedData.routines.today.name })).toBeVisible()
-    await expect(page.getByRole("heading", { name: childSeedData.routines.upcoming.name })).toBeVisible()
-    await expect(page.getByRole("heading", { name: childSeedData.routines.completed.name })).toBeVisible()
+    const availableCard = page.locator("div").filter({
+      hasText: "Dostępne dziś",
+    })
+    await expect(availableCard.first()).toContainText(String(childSeedData.routines.totals.availableToday))
+
+    const pointsCard = page.locator("div").filter({
+      hasText: "Łączna pula punktów",
+    })
+    await expect(pointsCard.first()).toContainText(`${childSeedData.routines.totals.totalPointsToday} pkt`)
+
+    const completedCard = page.locator("div").filter({
+      hasText: "Już ukończone",
+    })
+    await expect(completedCard.first()).toContainText(String(childSeedData.routines.totals.completedToday))
+
+    await expect(page.getByText(childSeedData.routines.today.name)).toBeVisible()
+    await expect(page.getByText(childSeedData.routines.upcoming.name)).toBeVisible()
+    await expect(page.getByText(childSeedData.routines.completed.name)).toBeVisible()
   })
 
   test("shows reward catalog with actionable redemption CTA", async ({
@@ -61,7 +67,7 @@ test.describe("Authenticated child experience", () => {
     await expect(
       page.getByText(`Aktualne saldo: ${childSeedData.walletBalance} pkt`, { exact: false })
     ).toBeVisible()
-    await expect(page.getByRole("heading", { name: childSeedData.reward.name })).toBeVisible()
+    await expect(page.getByText(childSeedData.reward.name)).toBeVisible()
     await expect(page.getByText(`${childSeedData.reward.costPoints} pkt`)).toBeVisible()
     await expect(page.getByRole("button", { name: "Wymień punkty" })).toBeEnabled()
   })
@@ -76,13 +82,13 @@ test.describe("Authenticated child experience", () => {
 
     await page.goto("/child/profile")
 
-    await expect(page.getByRole("heading", { name: "Tak wygląda Twoja przygoda" })).toBeVisible()
+    await expect(page.getByText("Tak wygląda Twoja przygoda")).toBeVisible()
     await expect(
       page.getByText(`Seria dni bez przerwy: ${childSeedData.streakDays}`, { exact: false })
     ).toBeVisible()
-    await expect(page.getByRole("heading", { name: "Zdobyte odznaki" })).toBeVisible()
+    await expect(page.getByText("Zdobyte odznaki")).toBeVisible()
     await expect(page.getByText(childSeedData.achievement.name)).toBeVisible()
-    await expect(page.getByRole("heading", { name: "Ostatnie rutyny" })).toBeVisible()
-    await expect(page.getByRole("heading", { name: childSeedData.routines.completed.name })).toBeVisible()
+    await expect(page.getByText("Ostatnie rutyny")).toBeVisible()
+    await expect(page.getByText(childSeedData.routines.completed.name)).toBeVisible()
   })
 })

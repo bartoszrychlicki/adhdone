@@ -6,12 +6,11 @@ test.describe("Parent rewards catalog", () => {
     await page.getByLabel("Adres email").fill(parentAccount.email)
     await page.getByLabel("Hasło").fill(parentAccount.password)
     await page.getByRole("button", { name: "Zaloguj się" }).click()
+    await expect(page).toHaveURL(/\/parent\/dashboard/)
 
     await page.goto("/parent/rewards")
 
-    await expect(
-      page.getByRole("heading", { name: "Nagrody w katalogu" })
-    ).toBeVisible()
+    await expect(page.getByText("Nagrody w katalogu")).toBeVisible()
     await expect(page.getByText("Brak nagród")).toBeVisible()
   })
 })

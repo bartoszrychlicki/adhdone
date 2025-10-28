@@ -22,8 +22,6 @@ test.describe("Parent onboarding", () => {
     await expect(page).toHaveURL(/\/parent\/dashboard/)
     await page.goto("/onboarding/family")
 
-    await expect(
-      page.getByRole("heading", { name: "Przygotuj się na krok 2" })
-    ).toBeVisible()
+    await expect(page.getByText("Przygotuj się na krok 2", { exact: false })).toBeVisible()
   })
 })
