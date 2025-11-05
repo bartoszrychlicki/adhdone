@@ -1,148 +1,61 @@
-import Link from "next/link"
-import { redirect } from "next/navigation"
-import {
-  ArrowRight,
-  CalendarClock,
-  CheckCircle2,
-  Clock,
-  ListCheck,
-  Timer,
-} from "lucide-react"
+import { CheckCircle2, Clock, Sparkles, Timer } from "lucide-react"
+import type { Metadata } from "next"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { getActiveProfile } from "@/lib/auth/get-active-profile"
-import { fetchChildRoutineBoard } from "@/lib/child/queries"
-import type { ChildRoutineBoardData } from "@/lib/child/types"
-import { createSupabaseServerClient } from "@/lib/supabase"
-import { cn } from "@/lib/utils"
+import { ChildRoutineTabs } from "./components/ChildRoutineTabs"
+import { buildChildRoutineTabsModel } from "./tab-model"
+import { fetchChildProfileSnapshot, fetchChildRoutineBoard, fetchChildRoutineSessionViewModelForChild } from "@/lib/child/queries"
+import type { ChildRoutineSessionViewModel } from "@/lib/child/types"
+import { createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { requireChildSession } from "@/lib/auth/child-session"
 
-type RoutineCardProps = {
-  sessionId: string
-  routineId: string
-  name: string
-  status: "today" | "upcoming" | "completed"
-  startAt: string | null
-  endAt: string | null
-  pointsAvailable: number
+export const metadata: Metadata = {
+  title: "Lista rutyn",
+  description: "Przeglądaj dostępne, nadchodzące i ukończone rutyny dnia.",
 }
+export default async function ChildRoutinesPage() {
+  const session = await requireChildSession()
+  const supabase = createSupabaseServiceRoleClient()
+  const board = await fetchChildRoutineBoard(supabase, session.childId)
+  const profileSnapshotPromise = fetchChildProfileSnapshot(supabase, session.familyId, session.childId)
 
-function RoutineStatusBadge({ status }: { status: RoutineCardProps["status"] }) {
-  const map: Record<RoutineCardProps["status"], { label: string; className: string }> = {
-    today: {
-      label: "Dostępna teraz",
-      className: "border-teal-400/60 bg-teal-500/20 text-teal-50",
-    },
-    upcoming: {
-      label: "Wkrótce",
-      className: "border-indigo-400/60 bg-indigo-500/20 text-indigo-50",
-    },
-    completed: {
-      label: "Ukończona",
-      className: "border-emerald-400/60 bg-emerald-500/20 text-emerald-50",
-    },
-  }
+  const { data: timezoneRow } = await supabase
+    .from("profiles")
+    .select("families(timezone)")
+    .eq("id", session.childId)
+    .maybeSingle<{ families: { timezone: string | null } | null }>()
 
-  const { label, className } = map[status]
-  return (
-    <Badge variant="outline" className={cn("text-xs uppercase tracking-wide", className)}>
-      {label}
-    </Badge>
+  const timezone = timezoneRow?.families?.timezone ?? "Europe/Warsaw"
+
+  const sessionIds = [
+    ...board.today,
+    ...board.upcoming,
+    ...board.completed,
+  ].map((preview) => preview.sessionId)
+
+  const uniqueSessionIds = Array.from(new Set(sessionIds))
+
+  const routineSessions = await Promise.all(
+    uniqueSessionIds.map(async (sessionId) => {
+      const details = await fetchChildRoutineSessionViewModelForChild(supabase, sessionId, session.childId)
+      return details
+    })
   )
-}
 
-function RoutineCard({ routine }: { routine: RoutineCardProps }) {
-  const dateFormatter = new Intl.DateTimeFormat("pl-PL", {
-    hour: "2-digit",
-    minute: "2-digit",
+  const sessionsWithData = routineSessions.filter(Boolean) as ChildRoutineSessionViewModel[]
+  const { tabs } = buildChildRoutineTabsModel({
+    board,
+    sessions: sessionsWithData,
+    timezone,
   })
 
-  const windowLabel =
-    routine.startAt && routine.endAt
-      ? `${dateFormatter.format(new Date(routine.startAt))} – ${dateFormatter.format(new Date(routine.endAt))}`
-      : routine.startAt
-        ? `${dateFormatter.format(new Date(routine.startAt))}`
-        : "Brak zaplanowanej godziny"
+  const profileSnapshot = await profileSnapshotPromise
 
-  const canStart = routine.status === "today"
-
-  return (
-    <Card
-      className={cn(
-        "h-full border-slate-800/60 bg-slate-900/40 text-slate-100 transition hover:border-white/30 hover:shadow-lg hover:shadow-teal-900/30",
-        canStart ? "border-teal-400/50" : routine.status === "upcoming" ? "border-indigo-400/50" : "opacity-90"
-      )}
-    >
-      <Link
-        href={`/child/routines/${routine.sessionId}`}
-        className="flex h-full flex-col gap-4 px-5"
-      >
-        <CardHeader className="space-y-3 px-0">
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle className="text-lg font-semibold text-white">{routine.name}</CardTitle>
-            <RoutineStatusBadge status={routine.status} />
-          </div>
-          <CardDescription className="flex items-center gap-2 text-xs text-violet-200/80">
-            <CalendarClock className="size-3.5" aria-hidden />
-            {windowLabel}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-1 flex-col justify-between gap-4 px-0 pb-5">
-          <div className="rounded-2xl border border-slate-800/60 bg-slate-950/40 px-4 py-3 text-sm text-slate-200/90">
-            <p className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-300/80">
-              <ListCheck className="size-3.5 text-teal-200" aria-hidden />
-              Punkty do zdobycia
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-teal-200">{routine.pointsAvailable} pkt</p>
-            <p className="text-xs text-slate-300/80">Wszystkie zadania dają bonus do serii.</p>
-          </div>
-          <Button
-            type="button"
-            className="mt-auto inline-flex items-center justify-center gap-2"
-            variant={canStart ? "default" : "outline"}
-            disabled={!canStart}
-          >
-            {canStart ? (
-              <>
-                Rozpocznij rutynę
-                <ArrowRight className="size-4" aria-hidden />
-              </>
-            ) : (
-              "Zobacz szczegóły"
-            )}
-          </Button>
-        </CardContent>
-      </Link>
-    </Card>
-  )
-}
-
-function flattenRoutines(board: ChildRoutineBoardData): RoutineCardProps[] {
-  return [
-    ...board.today.map((routine) => ({ ...routine })),
-    ...board.upcoming.map((routine) => ({ ...routine })),
-    ...board.completed.map((routine) => ({ ...routine })),
-  ]
-}
-
-export default async function ChildRoutinesPage() {
-  const activeProfile = await getActiveProfile()
-
-  if (!activeProfile) {
-    redirect("/auth/child")
-  }
-
-  if (activeProfile.role !== "child") {
-    redirect("/parent/dashboard")
-  }
-
-  const supabase = await createSupabaseServerClient()
-  const board = await fetchChildRoutineBoard(supabase, activeProfile.id)
-  const routines = flattenRoutines(board)
   const availableToday = board.today.length
   const totalPointsToday = board.today.reduce((sum, routine) => sum + routine.pointsAvailable, 0)
   const completedCount = board.completed.length
+  const streakDays = profileSnapshot.streakDays
+  const balancePoints = profileSnapshot.totalPoints
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -154,7 +67,7 @@ export default async function ChildRoutinesPage() {
         </p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-5 md:grid-cols-2">
         <Card className="border-teal-400/40 bg-teal-500/10 text-teal-50">
           <CardHeader className="space-y-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold text-white">
@@ -193,17 +106,36 @@ export default async function ChildRoutinesPage() {
           </CardHeader>
           <CardContent className="text-3xl font-semibold text-white">{completedCount}</CardContent>
         </Card>
+
+        <Card className="border-amber-400/40 bg-amber-500/10 text-amber-50">
+          <CardHeader className="space-y-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-white">
+              <Sparkles className="size-4" aria-hidden />
+              Seria dni
+            </CardTitle>
+            <CardDescription className="text-sm text-amber-100/90">
+              Utrzymuj rytm, aby zdobywać dodatkowe nagrody.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-3xl font-semibold text-white">{streakDays}</CardContent>
+        </Card>
+
+        <Card className="border-cyan-400/40 bg-cyan-500/10 text-cyan-50">
+          <CardHeader className="space-y-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold text-white">
+              <Clock className="size-4" aria-hidden />
+              Zebrane punkty
+            </CardTitle>
+            <CardDescription className="text-sm text-cyan-100/90">
+              Wykorzystaj punkty na nagrody w swoim sklepie.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-3xl font-semibold text-white">{balancePoints}</CardContent>
+        </Card>
       </section>
 
       <section className="space-y-4">
-        <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-lg font-semibold text-white">Lista rutyn</h3>
-          <p className="text-xs text-violet-200/70">
-            Kliknij kartę, aby zobaczyć zadania i rozpocząć, gdy rutyna jest dostępna.
-          </p>
-        </header>
-
-        {routines.length === 0 ? (
+        {tabs.length === 0 ? (
           <Card className="border-slate-800/60 bg-slate-900/40 text-slate-200/80">
             <CardHeader>
               <CardTitle className="text-base font-semibold text-white">Brak zaplanowanych rutyn</CardTitle>
@@ -213,11 +145,7 @@ export default async function ChildRoutinesPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {routines.map((routine) => (
-              <RoutineCard key={`${routine.sessionId}-${routine.routineId}`} routine={routine} />
-            ))}
-          </div>
+          <ChildRoutineTabs tabs={tabs} />
         )}
       </section>
     </div>
