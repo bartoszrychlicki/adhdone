@@ -1,10 +1,16 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import type { Metadata } from "next"
 import { ArrowLeft, MailCheck } from "lucide-react"
 
 import { ParentRegisterForm } from "@/components/auth/parent-register-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getActiveProfile } from "@/lib/auth/get-active-profile"
+
+export const metadata: Metadata = {
+  title: "Rejestracja rodzica",
+  description: "Załóż konto rodzica i rozpocznij konfigurację rodziny w Dzienniku Rutyn.",
+}
 
 export default async function ParentRegisterPage() {
   const activeProfile = await getActiveProfile()

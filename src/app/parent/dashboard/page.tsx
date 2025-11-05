@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import type { Metadata } from "next"
 import { ArrowRight, CalendarClock, CheckCircle2, LayoutDashboard } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
@@ -13,6 +14,11 @@ type FamilySettings = {
     completedSteps?: string[]
     isComplete?: boolean
   }
+}
+
+export const metadata: Metadata = {
+  title: "Panel rodzica",
+  description: "Przegląd statusu rutyn, konfiguracji i postępów w rodzinie.",
 }
 
 export default async function ParentDashboardPage() {

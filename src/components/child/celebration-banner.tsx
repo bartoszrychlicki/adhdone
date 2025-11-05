@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Confetti, Volume2, VolumeX } from "lucide-react"
+import { PartyPopper, Volume2, VolumeX } from "lucide-react"
 
 export function CelebrationBanner() {
   const [muted, setMuted] = useState(false)
@@ -16,7 +16,7 @@ export function CelebrationBanner() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-widest text-amber-100/90">
-            <Confetti className="size-5" aria-hidden />
+            <PartyPopper className="size-5" aria-hidden />
             Rutyna zakończona!
           </div>
           <h1 className="text-3xl font-semibold text-white">Świetna robota!</h1>
@@ -45,4 +45,3 @@ export function CelebrationBanner() {
     </div>
   )
 }
-

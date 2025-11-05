@@ -1,13 +1,19 @@
 import Link from "next/link"
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 import { ArrowRight, Clock, Medal, Trophy } from "lucide-react"
+
+import type { Metadata } from "next"
 
 import { CelebrationBanner } from "@/components/child/celebration-banner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getActiveProfile } from "@/lib/auth/get-active-profile"
-import { fetchChildRoutineSessionViewModel, fetchChildRoutineSuccessSummary } from "@/lib/child/queries"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { fetchChildRoutineSessionViewModelForChild, fetchChildRoutineSuccessSummary } from "@/lib/child/queries"
+import { createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { requireChildSession } from "@/lib/auth/child-session"
+
+export const metadata: Metadata = {
+  title: "Rutyna ukończona",
+}
 
 type RoutineSuccessPageProps = {
   params: Promise<{
@@ -29,26 +35,12 @@ function formatDateTime(value: string | null | undefined) {
 
 export default async function RoutineSuccessPage({ params }: RoutineSuccessPageProps) {
   const { sessionId } = await params
-
-  const activeProfile = await getActiveProfile()
-
-  if (!activeProfile) {
-    redirect("/auth/child")
-  }
-
-  if (activeProfile.role !== "child") {
-    redirect("/parent/dashboard")
-  }
-
-  const supabase = await createSupabaseServerClient()
-  const session = await fetchChildRoutineSessionViewModel(supabase, sessionId).catch(() => null)
+  const sessionContext = await requireChildSession()
+  const supabase = createSupabaseServiceRoleClient()
+  const session = await fetchChildRoutineSessionViewModelForChild(supabase, sessionId, sessionContext.childId)
 
   if (!session) {
     notFound()
-  }
-
-  if (session.childProfileId !== activeProfile.id) {
-    redirect("/child/home")
   }
 
   const data = await fetchChildRoutineSuccessSummary(supabase, sessionId, session)

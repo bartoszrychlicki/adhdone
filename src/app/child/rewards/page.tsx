@@ -1,30 +1,23 @@
-import { redirect } from "next/navigation"
 import { Lock } from "lucide-react"
+
+import type { Metadata } from "next"
 
 import { RewardImage } from "@/app/parent/rewards/reward-image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getActiveProfile } from "@/lib/auth/get-active-profile"
 import { fetchChildRewardsSnapshot } from "@/lib/child/queries"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { requireChildSession } from "@/lib/auth/child-session"
+
+export const metadata: Metadata = {
+  title: "Nagrody dziecka",
+  description: "Sprawdź dostępne nagrody i saldo punktów do wymiany.",
+}
 
 export default async function ChildRewardsPage() {
-  const activeProfile = await getActiveProfile()
-
-  if (!activeProfile) {
-    redirect("/auth/child")
-  }
-
-  if (activeProfile.role !== "child") {
-    redirect("/parent/dashboard")
-  }
-
-  if (!activeProfile.familyId) {
-    throw new Error("Profil dziecka nie ma przypisanej rodziny.")
-  }
-
-  const supabase = await createSupabaseServerClient()
-  const snapshot = await fetchChildRewardsSnapshot(supabase, activeProfile.familyId, activeProfile.id)
+  const session = await requireChildSession()
+  const supabase = createSupabaseServiceRoleClient()
+  const snapshot = await fetchChildRewardsSnapshot(supabase, session.familyId, session.childId)
   const pointsBalance = snapshot.balance
 
   return (

@@ -103,7 +103,7 @@ export type ProfileUpdateCommand = {
 
 export type ProfilePinUpdateCommand = {
   pin: string
-  rotateTokens?: boolean
+  storePlainPin?: boolean
 }
 
 export type PinUpdateResultDto = {

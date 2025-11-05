@@ -208,17 +208,17 @@ export function parseProfilePinPayload(
     throw new ValidationError("PIN must be 4-6 digits")
   }
 
-  const rotateTokens = record.rotateTokens
+  const storePlainPin = record.storePlainPin
   if (
-    typeof rotateTokens !== "undefined" &&
-    typeof rotateTokens !== "boolean"
+    typeof storePlainPin !== "undefined" &&
+    typeof storePlainPin !== "boolean"
   ) {
-    throw new ValidationError("rotateTokens must be a boolean")
+    throw new ValidationError("storePlainPin must be a boolean")
   }
 
   return {
     pin,
-    rotateTokens: rotateTokens ?? false
+    storePlainPin: storePlainPin ?? false
   }
 }
 

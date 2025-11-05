@@ -1,23 +1,19 @@
-import { redirect } from "next/navigation"
+import type { Metadata } from "next"
 
 import { RoutineBoard } from "@/components/child/routine-board"
 import { fetchChildRoutineBoard } from "@/lib/child/queries"
-import { getActiveProfile } from "@/lib/auth/get-active-profile"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { requireChildSession } from "@/lib/auth/child-session"
+
+export const metadata: Metadata = {
+  title: "Start dziecka",
+  description: "Zobacz rutyny dostępne dzisiaj i przygotuj się na kolejne zadania.",
+}
 
 export default async function ChildHomePage() {
-  const activeProfile = await getActiveProfile()
-
-  if (!activeProfile) {
-    redirect("/auth/child")
-  }
-
-  if (activeProfile.role !== "child") {
-    redirect("/parent/dashboard")
-  }
-
-  const supabase = await createSupabaseServerClient()
-  const routines = await fetchChildRoutineBoard(supabase, activeProfile.id)
+  const session = await requireChildSession()
+  const supabase = createSupabaseServiceRoleClient()
+  const routines = await fetchChildRoutineBoard(supabase, session.childId)
 
   return (
     <div className="flex flex-1 flex-col gap-6">

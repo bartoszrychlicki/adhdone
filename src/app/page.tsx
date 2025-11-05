@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowRight, Clock3, HeartHandshake } from "lucide-react"
 
@@ -9,6 +10,11 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getActiveProfile } from "@/lib/auth/get-active-profile"
+
+export const metadata: Metadata = {
+  title: "Wybierz tryb",
+  description: "Zaloguj się jako rodzic lub dziecko, aby rozpocząć pracę z Dziennikiem Rutyn.",
+}
 
 export default async function Home() {
   const activeProfile = await getActiveProfile()

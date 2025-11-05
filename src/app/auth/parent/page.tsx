@@ -1,10 +1,16 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import type { Metadata } from "next"
 import { ArrowLeft, ShieldCheck } from "lucide-react"
 
 import { ParentLoginForm } from "@/components/auth/parent-login-form"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getActiveProfile } from "@/lib/auth/get-active-profile"
+
+export const metadata: Metadata = {
+  title: "Logowanie rodzica",
+  description: "Zaloguj się do panelu rodzica, aby zarządzać rutynami i nagrodami dziecka.",
+}
 
 export default async function ParentLoginPage() {
   const activeProfile = await getActiveProfile()

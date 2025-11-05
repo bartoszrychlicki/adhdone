@@ -1,5 +1,11 @@
 "use server"
 
+import { redirect } from "next/navigation"
+
+import { createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { setChildSession } from "@/lib/auth/child-session"
+import { fetchChildRoutineBoard } from "@/lib/child/queries"
+
 type LoginState =
   | { status: "idle" }
   | { status: "error"; message: string }
@@ -17,25 +23,12 @@ function sanitizePin(value: FormDataEntryValue | null): string | null {
   return /^[0-9]{4,6}$/.test(pin) ? pin : null
 }
 
-function sanitizeToken(value: FormDataEntryValue | null): string | null {
-  if (typeof value !== "string") {
-    return null
-  }
-
-  const token = value.trim()
-  if (token.length === 0) {
-    return ""
-  }
-
-  return token.length >= 8 ? token : null
-}
-
 export async function loginChild(
   _prevState: LoginState,
   formData: FormData
 ): Promise<LoginState> {
   const pin = sanitizePin(formData.get("pin"))
-  const token = sanitizeToken(formData.get("token"))
+  const childIdRaw = formData.get("childId")
 
   if (pin === null) {
     return {
@@ -44,19 +37,62 @@ export async function loginChild(
     }
   }
 
-  if (token === null) {
+  if (pin.length === 0) {
     return {
       status: "error",
-      message: "Token powinien zawierać co najmniej 8 znaków.",
+      message: "PIN jest wymagany.",
     }
   }
 
-  // The backend flow for exchanging child PIN/token to a Supabase session
-  // is tracked separately. For now we keep the UI responsive and provide
-  // guidance to the user until the API is ready.
-  return {
-    status: "error",
-    message:
-      "Logowanie dziecka zostanie aktywowane po wygenerowaniu tokenu przez rodzica. Poproś rodzica o udostępnienie aktualnego linku lub PIN-u.",
+  if (typeof childIdRaw !== "string" || childIdRaw.trim().length === 0) {
+    return {
+      status: "error",
+      message: "Link logowania nie zawiera identyfikatora dziecka.",
+    }
   }
+
+  const childId = childIdRaw.trim()
+
+  const supabase = createSupabaseServiceRoleClient()
+
+  const { data: childProfile, error } = await supabase
+    .from("profiles")
+    .select("id, family_id, display_name, role, deleted_at, settings")
+    .eq("id", childId)
+    .maybeSingle()
+
+  if (error) {
+    console.error("[loginChild] Failed to fetch child profile", error)
+    return {
+      status: "error",
+      message: "Nie udało się zweryfikować profilu dziecka.",
+    }
+  }
+
+  if (!childProfile || childProfile.deleted_at || childProfile.role !== "child") {
+    return {
+      status: "error",
+      message: "Link logowania jest nieprawidłowy lub profil został dezaktywowany.",
+    }
+  }
+
+  const settings = (childProfile.settings as Record<string, unknown> | null) ?? null
+  const storedPin = typeof settings?.pin_plain === "string" ? settings.pin_plain : null
+
+  if (!storedPin || storedPin !== pin) {
+    return {
+      status: "error",
+      message: "PIN jest nieprawidłowy. Spróbuj ponownie lub poproś rodzica o aktualizację.",
+    }
+  }
+
+  await fetchChildRoutineBoard(supabase, childProfile.id)
+
+  await setChildSession({
+    childId: childProfile.id,
+    familyId: childProfile.family_id,
+    displayName: childProfile.display_name,
+  })
+
+  redirect("/child/home")
 }

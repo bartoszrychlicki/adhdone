@@ -53,6 +53,7 @@ type RoutineSessionRow = {
   completed_at: string | null
   points_awarded: number | null
   created_at: string
+  duration_seconds: number | null
 }
 
 type RoutineSessionInsert = Database["public"]["Tables"]["routine_sessions"]["Insert"]
@@ -472,6 +473,95 @@ export async function fetchChildRoutineSessionViewModel(
     durationSeconds: details.durationSeconds ?? null,
     totalPoints,
     pointsAwarded: details.pointsAwarded ?? 0,
+    steps,
+  }
+}
+
+export async function fetchChildRoutineSessionViewModelForChild(
+  client: AppSupabaseClient,
+  sessionId: string,
+  childProfileId: string
+): Promise<ChildRoutineSessionViewModel | null> {
+  const { data: sessionRow, error: sessionError } = await client
+    .from("routine_sessions")
+    .select(
+      "id, routine_id, child_profile_id, session_date, status, started_at, planned_end_at, completed_at, duration_seconds, points_awarded"
+    )
+    .eq("id", sessionId)
+    .eq("child_profile_id", childProfileId)
+    .maybeSingle()
+
+  if (sessionError) {
+    throw new Error(sessionError.message)
+  }
+
+  if (!sessionRow) {
+    return null
+  }
+
+  const { data: routineRow, error: routineError } = await client
+    .from("routines")
+    .select("id, name, start_time, end_time")
+    .eq("id", sessionRow.routine_id)
+    .maybeSingle<RoutineRow>()
+
+  if (routineError) {
+    throw new Error(routineError.message)
+  }
+
+  const { data: taskRows, error: taskError } = await client
+    .from("routine_tasks")
+    .select("id, name, description, points, expected_duration_seconds, is_optional, position")
+    .eq("routine_id", sessionRow.routine_id)
+    .eq("child_profile_id", childProfileId)
+    .eq("is_active", true)
+    .is("deleted_at", null)
+    .order("position", { ascending: true })
+
+  if (taskError) {
+    throw new Error(taskError.message)
+  }
+
+  const { data: completionRows, error: completionError } = await client
+    .from("task_completions")
+    .select("routine_task_id")
+    .eq("routine_session_id", sessionId)
+
+  if (completionError) {
+    throw new Error(completionError.message)
+  }
+
+  const completedTaskIds = new Set((completionRows ?? []).map((row) => row.routine_task_id as string))
+
+  const steps = (taskRows ?? []).map((row) => {
+    const task = row as RoutineTaskDetailRow
+    return {
+      id: task.id,
+      title: task.name,
+      description: task.description,
+      points: task.points ?? 0,
+      durationSeconds: task.expected_duration_seconds ?? null,
+      isOptional: task.is_optional,
+      status: completedTaskIds.has(task.id) ? "completed" : "pending",
+    }
+  })
+
+  const totalPoints = steps.reduce((sum, task) => sum + task.points, 0)
+
+  return {
+    id: sessionRow.id,
+    routineId: sessionRow.routine_id,
+    childProfileId: sessionRow.child_profile_id,
+    routineName: (routineRow ?? null)?.name ?? "Rutyna",
+    sessionDate: sessionRow.session_date,
+    status: sessionRow.status,
+    startedAt: sessionRow.started_at,
+    plannedEndAt:
+      sessionRow.planned_end_at ?? combineDateAndTime(sessionRow.session_date, (routineRow ?? null)?.end_time ?? null),
+    completedAt: sessionRow.completed_at,
+    durationSeconds: sessionRow.duration_seconds,
+    totalPoints,
+    pointsAwarded: sessionRow.points_awarded ?? 0,
     steps,
   }
 }

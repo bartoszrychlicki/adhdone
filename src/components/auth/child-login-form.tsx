@@ -2,7 +2,7 @@
 
 import { useActionState } from "react"
 import { useFormStatus } from "react-dom"
-import { AlertCircle, Loader2, QrCode, Shield } from "lucide-react"
+import { AlertCircle, Loader2, Shield } from "lucide-react"
 
 import { loginChild } from "@/app/auth/child/actions"
 import { Button } from "@/components/ui/button"
@@ -24,7 +24,7 @@ function SubmitButton() {
       {pending ? (
         <>
           <Loader2 className="size-4 animate-spin" aria-hidden />
-          Sprawdzanie tokenu…
+          Sprawdzanie PIN-u…
         </>
       ) : (
         "Wejdź do rutyn"
@@ -33,7 +33,12 @@ function SubmitButton() {
   )
 }
 
-export function ChildLoginForm({ className }: { className?: string }) {
+type ChildLoginFormProps = {
+  className?: string
+  defaultChildId?: string
+}
+
+export function ChildLoginForm({ className, defaultChildId }: ChildLoginFormProps) {
   const [state, formAction] = useActionState(loginChild, initialState)
 
   return (
@@ -41,38 +46,15 @@ export function ChildLoginForm({ className }: { className?: string }) {
       <CardHeader className="space-y-3">
         <CardTitle className="text-2xl font-semibold text-white">Witaj, bohaterze!</CardTitle>
         <CardDescription className="text-sm text-violet-100/90">
-          Podaj token lub PIN otrzymany od rodzica. Token jest ważny przez 2 godziny i blokuje powrót do
-          zadania po wylogowaniu.
+          Otworzyliśmy link od rodzica. Wpisz PIN, aby wejść do swoich rutyn.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         <form action={formAction} className="space-y-5" noValidate>
           <div className="space-y-2">
-            <label htmlFor="token" className="text-sm font-medium text-white">
-              Token dostępu (polecane)
-            </label>
-            <div className="relative flex items-center">
-              <Input
-                id="token"
-                name="token"
-                type="text"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder="np. a1B2c3D4e5"
-                className="pr-10"
-                aria-describedby="token-help"
-              />
-              <QrCode className="pointer-events-none absolute right-3 size-4 text-violet-200/70" aria-hidden />
-            </div>
-            <p id="token-help" className="text-xs text-violet-100/80">
-              Token możesz zeskanować z kodu QR lub wkleić ręcznie.
-            </p>
-          </div>
-
-          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <label htmlFor="pin" className="text-sm font-medium text-white">
-                PIN (opcjonalnie)
+                PIN logowania
               </label>
               <div className="inline-flex items-center gap-2 text-xs text-violet-100/80">
                 <Shield className="size-3.5" aria-hidden />
@@ -88,9 +70,12 @@ export function ChildLoginForm({ className }: { className?: string }) {
               maxLength={6}
               minLength={4}
               autoComplete="one-time-code"
-              placeholder="••••"
+              placeholder="np. 5678"
+              required
             />
           </div>
+
+          {defaultChildId ? <input type="hidden" name="childId" value={defaultChildId} /> : null}
 
           {state.status === "error" ? (
             <div className="flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-500/10 p-3 text-sm text-amber-100">
@@ -103,9 +88,10 @@ export function ChildLoginForm({ className }: { className?: string }) {
         </form>
 
         <p className="text-center text-xs text-violet-100/80">
-          Nie masz tokenu? Poproś rodzica o wygenerowanie nowego w jego panelu.
+          Jeśli zapomnisz PIN-u, poproś rodzica o ustawienie nowego w jego panelu.
         </p>
       </CardContent>
     </Card>
   )
 }
+

@@ -1,6 +1,6 @@
-import { notFound, redirect } from "next/navigation"
-
 import Link from "next/link"
+import { notFound, redirect } from "next/navigation"
+import type { Metadata } from "next"
 
 import { AppShellChild } from "@/components/child/app-shell-child"
 import { RoutineBoard } from "@/components/child/routine-board"
@@ -13,6 +13,10 @@ import {
   fetchChildRewardsSnapshot,
   fetchChildRoutineBoard,
 } from "@/lib/child/queries"
+
+export const metadata: Metadata = {
+  title: "Podgląd interfejsu dziecka",
+}
 
 type PreviewPageProps = {
   params: Promise<{

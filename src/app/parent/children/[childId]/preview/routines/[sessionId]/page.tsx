@@ -1,10 +1,16 @@
 import { notFound, redirect } from "next/navigation"
 
+import type { Metadata } from "next"
+
 import { AppShellChild } from "@/components/child/app-shell-child"
 import { RoutineSessionView } from "@/components/child/routine-session-view"
 import { getActiveProfile } from "@/lib/auth/get-active-profile"
 import { fetchChildRewardsSnapshot, fetchChildRoutineSessionViewModel } from "@/lib/child/queries"
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase"
+
+export const metadata: Metadata = {
+  title: "Podgląd rutyny dziecka",
+}
 
 type PreviewRoutinePageProps = {
   params: Promise<{

@@ -19,7 +19,6 @@ import {
 } from "../_lib/errors"
 import type { AuthContext } from "../_lib/authContext"
 import type { AppSupabaseClient } from "../_lib/types"
-import { deactivateActiveTokens } from "./tokensService"
 
 type Client = AppSupabaseClient
 
@@ -170,7 +169,16 @@ function buildInsertPayload(
     display_name: command.displayName,
     email: command.email ?? null,
     avatar_url: command.avatarUrl ?? null,
-    settings: command.settings ?? {},
+    settings: (() => {
+      const baseSettings = (command.settings ?? {}) as Record<string, unknown>
+      const nextSettings: Record<string, unknown> = { ...baseSettings }
+
+      if (typeof command.pin === "string" && command.pin.length > 0) {
+        nextSettings.pin_plain = command.pin
+      }
+
+      return nextSettings
+    })(),
     pin_failed_attempts: 0,
     pin_lock_expires_at: null
   }
@@ -284,6 +292,7 @@ async function fetchProfileRow(
         id,
         family_id,
         role,
+        settings,
         pin_failed_attempts,
         pin_lock_expires_at,
         deleted_at
@@ -325,14 +334,31 @@ export async function updateProfilePin(
 
   const pinHash = hashPin(command.pin)
 
+  const existingSettings = (profile.settings ?? {}) as Record<string, unknown>
+  let settingsPayload: Record<string, unknown> | undefined
+
+  if (command.storePlainPin) {
+    settingsPayload = { ...existingSettings, pin_plain: command.pin }
+  } else if (Object.prototype.hasOwnProperty.call(existingSettings, "pin_plain")) {
+    const nextSettings = { ...existingSettings }
+    delete nextSettings.pin_plain
+    settingsPayload = nextSettings
+  }
+
+  const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
+    pin_hash: pinHash,
+    pin_failed_attempts: 0,
+    pin_lock_expires_at: null,
+    updated_at: new Date().toISOString(),
+  }
+
+  if (typeof settingsPayload !== "undefined") {
+    updatePayload.settings = settingsPayload
+  }
+
   const { data, error } = await client
     .from("profiles")
-    .update({
-      pin_hash: pinHash,
-      pin_failed_attempts: 0,
-      pin_lock_expires_at: null,
-      updated_at: new Date().toISOString()
-    })
+    .update(updatePayload)
     .eq("id", profileId)
     .select(
       `
@@ -344,10 +370,6 @@ export async function updateProfilePin(
 
   if (error) {
     throw mapSupabaseError(error)
-  }
-
-  if (command.rotateTokens) {
-    await deactivateActiveTokens(client, profileId, context.profileId)
   }
 
   return {

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import type { Metadata } from "next"
 import { Gift, ToggleLeft, ToggleRight } from "lucide-react"
 
 import { RewardImage } from "./reward-image"
@@ -34,6 +35,11 @@ function resolveSource(settings: Record<string, unknown> | null): { label: strin
   }
 
   return { label: "Inne", badgeVariant: "outline" }
+}
+
+export const metadata: Metadata = {
+  title: "Nagrody rodzica",
+  description: "Zarządzaj nagrodami dostępnymi dla dzieci i kontroluj ich widoczność.",
 }
 
 export default async function ParentRewardsPage() {

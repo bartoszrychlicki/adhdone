@@ -1,9 +1,15 @@
 import { notFound, redirect } from "next/navigation"
 
+import type { Metadata } from "next"
+
 import { RoutineSessionView } from "@/components/child/routine-session-view"
-import { getActiveProfile } from "@/lib/auth/get-active-profile"
-import { fetchChildRoutineSessionViewModel } from "@/lib/child/queries"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { fetchChildRoutineSessionViewModelForChild } from "@/lib/child/queries"
+import { createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { requireChildSession } from "@/lib/auth/child-session"
+
+export const metadata: Metadata = {
+  title: "Rutyna – szczegóły",
+}
 
 type RoutineSessionPageProps = {
   params: Promise<{
@@ -13,24 +19,15 @@ type RoutineSessionPageProps = {
 
 export default async function RoutineSessionPage({ params }: RoutineSessionPageProps) {
   const { sessionId } = await params
-  const activeProfile = await getActiveProfile()
-
-  if (!activeProfile) {
-    redirect("/auth/child")
-  }
-
-  if (activeProfile.role !== "child") {
-    redirect("/parent/dashboard")
-  }
-
-  const supabase = await createSupabaseServerClient()
-  const session = await fetchChildRoutineSessionViewModel(supabase, sessionId).catch(() => null)
+  const sessionContext = await requireChildSession()
+  const supabase = createSupabaseServiceRoleClient()
+  const session = await fetchChildRoutineSessionViewModelForChild(supabase, sessionId, sessionContext.childId)
 
   if (!session) {
     notFound()
   }
 
-  if (session.childProfileId !== activeProfile.id) {
+  if (session.childProfileId !== sessionContext.childId) {
     redirect("/child/home")
   }
 

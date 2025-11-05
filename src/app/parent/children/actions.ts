@@ -29,54 +29,43 @@ async function performAuthedRequest(path: string, init: RequestInit) {
   return response
 }
 
-export async function generateTokenAction(
+export async function updatePinAction(
   _prevState: { status: "idle" | "success" | "error"; message?: string },
   formData: FormData
 ) {
   try {
     const childId = formData.get("childId")
+    const pin = formData.get("pin")
+    const storePlainPinValue = formData.get("storePlainPin")
+    const storePlainPin = storePlainPinValue === "true" || storePlainPinValue === "on"
+
     if (typeof childId !== "string" || childId.length === 0) {
       return { status: "error", message: "Brak identyfikatora dziecka." }
     }
 
-    await performAuthedRequest(`/api/v1/profiles/${childId}/access-tokens`, {
+    if (typeof pin !== "string" || pin.trim().length === 0) {
+      return { status: "error", message: "PIN jest wymagany." }
+    }
+
+    const normalizedPin = pin.trim()
+    if (!/^\d{4,6}$/.test(normalizedPin)) {
+      return { status: "error", message: "PIN powinien mieć od 4 do 6 cyfr." }
+    }
+
+    await performAuthedRequest(`/api/v1/profiles/${childId}/pin`, {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({
+        pin: normalizedPin,
+        storePlainPin,
+      }),
     })
 
     revalidatePath("/parent/children")
-    return { status: "success", message: "Wygenerowano nowy token." }
+    return { status: "success", message: "PIN został zaktualizowany." }
   } catch (error) {
     return {
       status: "error",
-      message: error instanceof Error ? error.message : "Nie udało się wygenerować tokenu.",
-    }
-  }
-}
-
-export async function deactivateTokenAction(
-  _prevState: { status: "idle" | "success" | "error"; message?: string },
-  formData: FormData
-) {
-  try {
-    const childId = formData.get("childId")
-    const tokenId = formData.get("tokenId")
-
-    if (typeof childId !== "string" || typeof tokenId !== "string" || childId.length === 0 || tokenId.length === 0) {
-      return { status: "error", message: "Brak identyfikatora tokenu." }
-    }
-
-    await performAuthedRequest(`/api/v1/child-access-tokens/${tokenId}/deactivate`, {
-      method: "POST",
-      body: JSON.stringify({}),
-    })
-
-    revalidatePath("/parent/children")
-    return { status: "success", message: "Token został dezaktywowany." }
-  } catch (error) {
-    return {
-      status: "error",
-      message: error instanceof Error ? error.message : "Nie udało się dezaktywować tokenu.",
+      message: error instanceof Error ? error.message : "Nie udało się zaktualizować PIN-u.",
     }
   }
 }

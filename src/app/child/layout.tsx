@@ -1,10 +1,10 @@
 import type { ReactNode } from "react"
-import { redirect } from "next/navigation"
 
 import { AppShellChild } from "@/components/child/app-shell-child"
 import { getChildWallet } from "@/app/api/_services/walletService"
-import { createSupabaseServerClient } from "@/lib/supabase"
-import { getActiveProfile } from "@/lib/auth/get-active-profile"
+import { createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { clearChildSession, requireChildSession } from "@/lib/auth/child-session"
+import { redirect } from "next/navigation"
 
 type ChildLayoutProps = {
   children: ReactNode
@@ -15,47 +15,47 @@ type FamilyRow = {
 }
 
 export default async function ChildLayout({ children }: ChildLayoutProps) {
-  const activeProfile = await getActiveProfile()
+  const session = await requireChildSession()
+  const supabase = createSupabaseServiceRoleClient()
 
-  if (!activeProfile) {
+  const { data: childProfile, error: childError } = await supabase
+    .from("profiles")
+    .select("id, display_name, family_id, deleted_at")
+    .eq("id", session.childId)
+    .maybeSingle()
+
+  if (childError || !childProfile || childProfile.deleted_at) {
+    await clearChildSession()
     redirect("/auth/child")
   }
 
-  if (activeProfile.role !== "child") {
-    redirect("/parent/dashboard")
-  }
-
-  const supabase = await createSupabaseServerClient()
   let pointsBalance = 0
   let familyName: string | null = null
 
-  if (activeProfile.familyId) {
-    try {
-      const wallet = await getChildWallet(supabase, activeProfile.familyId, activeProfile.id, 0)
-      pointsBalance = wallet.balance
-    } catch (error) {
-      console.warn("[ChildLayout] Failed to load wallet snapshot", error)
-    }
-
-    const familyResult = await supabase
-      .from("families")
-      .select("family_name")
-      .eq("id", activeProfile.familyId)
-      .maybeSingle<FamilyRow>()
-
-    if (familyResult.error) {
-      console.warn("[ChildLayout] Failed to load family info", familyResult.error)
-    }
-
-    familyName = familyResult.data?.family_name ?? null
+  try {
+    const wallet = await getChildWallet(supabase, session.familyId, session.childId, 0)
+    pointsBalance = wallet.balance
+  } catch (error) {
+    console.warn("[ChildLayout] Failed to load wallet snapshot", error)
   }
+
+  const { data: familyRow, error: familyError } = await supabase
+    .from("families")
+    .select("family_name")
+    .eq("id", session.familyId)
+    .maybeSingle<FamilyRow>()
+
+  if (familyError) {
+    console.warn("[ChildLayout] Failed to load family info", familyError)
+  }
+
+  familyName = familyRow?.family_name ?? null
 
   return (
     <AppShellChild
-      childName={activeProfile.displayName}
+      childName={session.displayName}
       familyName={familyName}
       pointsBalance={pointsBalance}
-      returnHref="/"
     >
       {children}
     </AppShellChild>

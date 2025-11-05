@@ -21,15 +21,12 @@ export function SequentialTaskList({ steps, onCompleteChange }: SequentialTaskLi
 
   useEffect(() => {
     onCompleteChange?.(completedIds)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completedIds])
+  }, [completedIds, onCompleteChange])
 
   useEffect(() => {
     setActiveIndex(0)
     const nextCompleted = orderedSteps.filter((step) => step.status === "completed").map((step) => step.id)
     setCompletedIds(nextCompleted)
-    onCompleteChange?.(nextCompleted)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderedSteps])
 
   function markStepComplete(stepId: string) {
@@ -39,7 +36,6 @@ export function SequentialTaskList({ steps, onCompleteChange }: SequentialTaskLi
 
     setCompletedIds((prev) => {
       const next = [...prev, stepId]
-      onCompleteChange?.(next)
       return next
     })
     setActiveIndex((prev) => Math.min(prev + 1, orderedSteps.length - 1))

@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
+import type { Metadata } from "next"
 import { CalendarClock, Check, Play, Square } from "lucide-react"
 
 import { toggleRoutineActiveAction } from "./actions"
@@ -30,12 +31,26 @@ type ToggleFormProps = {
   isActive: boolean
 }
 
+export const metadata: Metadata = {
+  title: "Rutyny rodzica",
+  description: "Lista rutyn rozpisanych dla dzieci wraz z możliwością ich aktywacji i edycji.",
+}
+
 function ToggleForm({ routineId, isActive }: ToggleFormProps) {
   return (
     <form action={toggleRoutineActiveAction} className="inline-flex">
       <input type="hidden" name="routineId" value={routineId} />
       <input type="hidden" name="isActive" value={(!isActive).toString()} />
-      <Button type="submit" variant={isActive ? "outline" : "default"} size="sm">
+      <Button
+        type="submit"
+        variant={isActive ? "destructive" : "default"}
+        size="sm"
+        className={
+          isActive
+            ? "border border-red-500/60 bg-red-500/25 text-red-50 hover:bg-red-500/40"
+            : "border border-emerald-500/50 bg-emerald-500/20 text-emerald-950 hover:bg-emerald-500/35"
+        }
+      >
         {isActive ? (
           <>
             <Square className="mr-2 size-4" aria-hidden />
@@ -173,8 +188,12 @@ export default async function ParentRoutinesPage() {
                   </td>
                   <td className="px-4 py-4 text-right align-top">
                     <div className="flex justify-end gap-2">
-                      <Button asChild variant="ghost" size="sm" className="text-slate-300 hover:text-white">
-                        <Link href={`/parent/routines/${routine.id}`}>Szczegóły</Link>
+                      <Button
+                        asChild
+                        size="sm"
+                        className="bg-slate-100 text-slate-900 hover:bg-slate-200"
+                      >
+                        <Link href={`/parent/routines/${routine.id}`}>Edytuj</Link>
                       </Button>
                       <ToggleForm routineId={routine.id} isActive={routine.isActive} />
                     </div>

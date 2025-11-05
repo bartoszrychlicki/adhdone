@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { AlertTriangle, Trophy } from "lucide-react"
 
@@ -60,6 +60,10 @@ export function RoutineSessionView({ session, sessionId }: RoutineSessionViewPro
     [session.steps]
   )
 
+  const handleCompletedChange = useCallback((ids: string[]) => {
+    setCompletedIds(ids)
+  }, [])
+
   return (
     <div className="flex flex-1 flex-col gap-6">
       <header className="space-y-3">
@@ -88,7 +92,7 @@ export function RoutineSessionView({ session, sessionId }: RoutineSessionViewPro
           <CardContent className="flex flex-col gap-5">
             <SequentialTaskList
               steps={orderedSteps}
-              onCompleteChange={(ids) => setCompletedIds(ids)}
+              onCompleteChange={handleCompletedChange}
             />
           </CardContent>
         </Card>

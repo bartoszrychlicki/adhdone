@@ -1,11 +1,17 @@
-import { redirect } from "next/navigation"
 import { CalendarCheck2, Flame, Medal } from "lucide-react"
+
+import type { Metadata } from "next"
 
 import { RewardImage } from "@/app/parent/rewards/reward-image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getActiveProfile } from "@/lib/auth/get-active-profile"
 import { fetchChildProfileSnapshot } from "@/lib/child/queries"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServiceRoleClient } from "@/lib/supabase"
+import { requireChildSession } from "@/lib/auth/child-session"
+
+export const metadata: Metadata = {
+  title: "Profil dziecka",
+  description: "Podsumowanie odznak, postępów i historii rutyn.",
+}
 
 function formatDate(value: string) {
   try {
@@ -16,22 +22,9 @@ function formatDate(value: string) {
 }
 
 export default async function ChildProfilePage() {
-  const activeProfile = await getActiveProfile()
-
-  if (!activeProfile) {
-    redirect("/auth/child")
-  }
-
-  if (activeProfile.role !== "child") {
-    redirect("/parent/dashboard")
-  }
-
-  if (!activeProfile.familyId) {
-    throw new Error("Profil dziecka nie ma przypisanej rodziny.")
-  }
-
-  const supabase = await createSupabaseServerClient()
-  const profile = await fetchChildProfileSnapshot(supabase, activeProfile.familyId, activeProfile.id)
+  const session = await requireChildSession()
+  const supabase = createSupabaseServiceRoleClient()
+  const profile = await fetchChildProfileSnapshot(supabase, session.familyId, session.childId)
 
   return (
     <div className="flex flex-1 flex-col gap-6">

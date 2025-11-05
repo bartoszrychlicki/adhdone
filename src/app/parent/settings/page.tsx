@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import type { Metadata } from "next"
 
 import { FamilySettingsForm } from "./family-settings-form"
 import {
@@ -48,6 +49,11 @@ function mapFamilySettings(settings: Record<string, unknown> | null): FamilySett
   }
 }
 
+export const metadata: Metadata = {
+  title: "Ustawienia rodziny",
+  description: "Zarządzaj nazwą rodziny, strefą czasową i powiadomieniami.",
+}
+
 export default async function ParentSettingsPage() {
   const activeProfile = await getActiveProfile()
 
@@ -94,4 +100,3 @@ export default async function ParentSettingsPage() {
     </div>
   )
 }
-

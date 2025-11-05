@@ -19,7 +19,7 @@ export function AppShellChild({
   childName,
   familyName,
   pointsBalance,
-  returnHref = "/",
+  returnHref = "/auth/child/logout",
   children,
 }: AppShellChildProps) {
   return (
@@ -61,4 +61,3 @@ export function AppShellChild({
     </div>
   )
 }
-
