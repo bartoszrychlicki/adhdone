@@ -4,7 +4,7 @@ import { AppShellChild } from "@/components/child/app-shell-child"
 import { RoutineSessionView } from "@/components/child/routine-session-view"
 import { getActiveProfile } from "@/lib/auth/get-active-profile"
 import { fetchChildRewardsSnapshot, fetchChildRoutineSessionViewModel } from "@/lib/child/queries"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase"
 
 type PreviewRoutinePageProps = {
   params: Promise<{
@@ -52,10 +52,20 @@ export default async function ParentChildRoutinePreviewPage({ params }: PreviewR
     notFound()
   }
 
-  const session = await fetchChildRoutineSessionViewModel(supabase, sessionId).catch(() => null)
+  let session = await fetchChildRoutineSessionViewModel(supabase, sessionId).catch(() => null)
 
   if (!session || session.childProfileId !== childProfile.id) {
-    notFound()
+    try {
+      const serviceClient = createSupabaseServiceRoleClient()
+      session = await fetchChildRoutineSessionViewModel(serviceClient, sessionId).catch(() => null)
+    } catch (error) {
+      console.warn("[ParentChildRoutinePreviewPage] Service role fallback failed", error)
+      session = null
+    }
+
+    if (!session || session.childProfileId !== childProfile.id) {
+      notFound()
+    }
   }
 
   const [{ data: family }, rewardsSnapshot] = await Promise.all([
