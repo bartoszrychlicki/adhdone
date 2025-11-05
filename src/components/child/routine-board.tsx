@@ -17,7 +17,7 @@ function formatTime(value: string | null) {
   }
 }
 
-function RoutineCard({ routine }: { routine: ChildRoutinePreview }) {
+function RoutineCard({ routine, href }: { routine: ChildRoutinePreview; href: string }) {
   const isDisabled = routine.status === "completed" || routine.status === "upcoming"
   const startLabel = formatTime(routine.startAt)
   const endLabel = formatTime(routine.endAt)
@@ -30,7 +30,7 @@ function RoutineCard({ routine }: { routine: ChildRoutinePreview }) {
 
   return (
     <Link
-      href={`/child/routines/${routine.sessionId}`}
+      href={href}
       className={cn(
         "group relative flex flex-col gap-3 rounded-2xl border px-5 py-6 text-left transition hover:scale-[1.01] hover:border-white/40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-teal-300/60",
         cardColors[routine.status],
@@ -63,13 +63,18 @@ function RoutineCard({ routine }: { routine: ChildRoutinePreview }) {
       </div>
 
       <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-teal-100/80">
-        {routine.status === "today" ? "Wejdź do rutyny" : "Szczegóły"} <ArrowRight className="size-3" aria-hidden />
+          {routine.status === "today" ? "Wejdź do rutyny" : "Szczegóły"} <ArrowRight className="size-3" aria-hidden />
       </span>
     </Link>
   )
 }
 
-export function RoutineBoard({ routines }: { routines: ChildRoutineBoardData }) {
+type RoutineBoardProps = {
+  routines: ChildRoutineBoardData
+  getRoutineHref?: (routine: ChildRoutinePreview) => string
+}
+
+export function RoutineBoard({ routines, getRoutineHref }: RoutineBoardProps) {
   return (
     <div className="flex flex-col gap-6">
       <section aria-labelledby="routine-today" className="space-y-3">
@@ -81,7 +86,11 @@ export function RoutineBoard({ routines }: { routines: ChildRoutineBoardData }) 
         </header>
         <div className="grid gap-4">
           {routines.today.map((routine) => (
-            <RoutineCard key={`${routine.sessionId}-${routine.routineId}`} routine={routine} />
+            <RoutineCard
+              key={`${routine.sessionId}-${routine.routineId}`}
+              routine={routine}
+              href={getRoutineHref?.(routine) ?? `/child/routines/${routine.sessionId}`}
+            />
           ))}
         </div>
       </section>
@@ -100,7 +109,11 @@ export function RoutineBoard({ routines }: { routines: ChildRoutineBoardData }) 
             </p>
           ) : (
             routines.upcoming.map((routine) => (
-              <RoutineCard key={`${routine.sessionId}-${routine.routineId}`} routine={routine} />
+              <RoutineCard
+                key={`${routine.sessionId}-${routine.routineId}`}
+                routine={routine}
+                href={getRoutineHref?.(routine) ?? `/child/routines/${routine.sessionId}`}
+              />
             ))
           )}
         </div>
@@ -120,7 +133,11 @@ export function RoutineBoard({ routines }: { routines: ChildRoutineBoardData }) 
             </p>
           ) : (
             routines.completed.map((routine) => (
-              <RoutineCard key={`${routine.sessionId}-${routine.routineId}`} routine={routine} />
+              <RoutineCard
+                key={`${routine.sessionId}-${routine.routineId}`}
+                routine={routine}
+                href={getRoutineHref?.(routine) ?? `/child/routines/${routine.sessionId}`}
+              />
             ))
           )}
         </div>

@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation"
 
+import Link from "next/link"
+
 import { AppShellChild } from "@/components/child/app-shell-child"
 import { RoutineBoard } from "@/components/child/routine-board"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -82,10 +84,13 @@ export default async function ParentChildPreviewPage({ params }: PreviewPageProp
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-white">Najbliższe rutyny</h2>
             <Button asChild variant="outline" className="border-slate-800/60 bg-slate-900/50 text-xs">
-              <a href="/parent/children">Powrót do panelu rodzica</a>
+              <Link href="/parent/children">Powrót do panelu rodzica</Link>
             </Button>
           </div>
-          <RoutineBoard routines={routineBoard} />
+          <RoutineBoard
+            routines={routineBoard}
+            getRoutineHref={(routine) => `/parent/children/${childProfile.id}/preview/routines/${routine.sessionId}`}
+          />
         </section>
 
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
