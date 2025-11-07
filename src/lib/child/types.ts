@@ -52,6 +52,7 @@ export type ChildRoutineSuccessSummary = {
   pointsEarned: number
   pointsRecord?: number
   bestDurationSeconds?: number | null
+  previousBestDurationSeconds?: number | null
   bestTimeBeaten: boolean
   badgesUnlocked: Array<{
     id: string

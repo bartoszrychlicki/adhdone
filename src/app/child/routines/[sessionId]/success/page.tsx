@@ -47,6 +47,17 @@ function formatDurationLabel(seconds: number | null | undefined, fallbackMinutes
   return "—"
 }
 
+function formatDurationDifference(diffSeconds: number): string {
+  const total = Math.abs(diffSeconds)
+  const minutes = Math.floor(total / 60)
+  const seconds = total % 60
+  if (minutes > 0) {
+    const secLabel = seconds > 0 ? ` ${seconds}s` : ""
+    return `${minutes}m${secLabel}`
+  }
+  return `${seconds}s`
+}
+
 export default async function RoutineSuccessPage({ params }: RoutineSuccessPageProps) {
   const { sessionId } = await params
   const sessionContext = await requireChildSession()
@@ -88,14 +99,53 @@ export default async function RoutineSuccessPage({ params }: RoutineSuccessPageP
             </CardTitle>
             <CardDescription className="text-sm text-violet-100/90">
               {data.bestTimeBeaten
-                ? "Nowy rekord! To Twój najszybszy czas."
+                ? "Nowy rekord dnia!"
                 : data.bestDurationSeconds
-                  ? `Rekord rodzinny: ${formatDurationLabel(data.bestDurationSeconds, data.totalTimeMinutes)}`
+                  ? "Możesz jeszcze przyspieszyć."
                   : "To Twój pierwszy zapisany czas dla tej rutyny."}
             </CardDescription>
           </CardHeader>
           <CardContent className="text-3xl font-semibold text-white">
             {formatDurationLabel(data.totalDurationSeconds, data.totalTimeMinutes)}
+            <div className="mt-3 space-y-1 text-sm text-violet-100/90">
+              <p>
+                Rekord tej rutyny:{" "}
+                <span className="font-semibold text-white">
+                  {data.bestDurationSeconds
+                    ? formatDurationLabel(data.bestDurationSeconds, data.totalTimeMinutes)
+                    : "—"}
+                </span>
+              </p>
+              {(() => {
+                const current = data.totalDurationSeconds ?? null
+                const best = data.bestDurationSeconds ?? null
+                if (!current || !best) {
+                  return (
+                    <p>
+                      To bazowy wynik – kolejne misje będą się z nim porównywać.
+                    </p>
+                  )
+                }
+
+                if (data.bestTimeBeaten) {
+                  const previousBest =
+                    data.previousBestDurationSeconds ?? best
+                  const improvement = previousBest > current ? previousBest - current : 0
+                  return improvement > 0 ? (
+                    <p>Przyspieszyłeś o {formatDurationDifference(improvement)} względem poprzedniego rekordu.</p>
+                  ) : (
+                    <p>Nowy rekord ustanowiony!</p>
+                  )
+                }
+
+                const shortfall = current - best
+                return shortfall > 0 ? (
+                  <p>Brakło {formatDurationDifference(shortfall)} do rekordu. Spróbuj jeszcze raz!</p>
+                ) : (
+                  <p>Utrzymałeś dotychczasowy rekord.</p>
+                )
+              })()}
+            </div>
           </CardContent>
         </Card>
       </section>

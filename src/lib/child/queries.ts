@@ -660,6 +660,26 @@ export async function fetchChildRoutineSuccessSummary(
   const totalTimeMinutes =
     session.durationSeconds && session.durationSeconds > 0 ? Math.max(1, Math.round(session.durationSeconds / 60)) : 0
 
+  let previousBestDurationSeconds: number | null = null
+
+  if (session.bestTimeBeaten) {
+    const { data: previousBestRow } = await client
+      .from("routine_sessions")
+      .select("duration_seconds")
+      .eq("child_profile_id", session.childProfileId)
+      .eq("routine_id", session.routineId)
+      .eq("status", "completed")
+      .neq("id", session.id)
+      .gt("duration_seconds", 0)
+      .order("duration_seconds", { ascending: true })
+      .limit(1)
+      .maybeSingle<{ duration_seconds: number | null }>()
+
+    previousBestDurationSeconds = previousBestRow?.duration_seconds ?? null
+  } else {
+    previousBestDurationSeconds = performanceEntry?.bestDurationSeconds ?? null
+  }
+
   return {
     routineName: session.routineName,
     totalTimeMinutes,
@@ -667,6 +687,7 @@ export async function fetchChildRoutineSuccessSummary(
     pointsEarned: session.pointsAwarded,
     pointsRecord,
     bestDurationSeconds,
+    previousBestDurationSeconds,
     bestTimeBeaten: session.bestTimeBeaten,
     badgesUnlocked: badges,
     nextRoutine,
