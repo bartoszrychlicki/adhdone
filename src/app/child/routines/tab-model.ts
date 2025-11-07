@@ -4,6 +4,7 @@ import type {
   ChildRoutineSessionViewModel,
   ChildRoutineTask,
 } from "@/lib/child/types"
+import type { RoutinePerformanceStatDto } from "@/types"
 import type { RoutineTab, RoutineTask } from "./components/ChildRoutineTabs"
 
 type BuildTabsParams = {
@@ -11,6 +12,7 @@ type BuildTabsParams = {
   sessions: ChildRoutineSessionViewModel[]
   timezone: string
   now?: Date
+  performanceStats?: RoutinePerformanceStatDto[]
 }
 
 type RoutineSessionLookup = Map<string, ChildRoutineSessionViewModel>
@@ -216,7 +218,8 @@ function toRoutineTab(
   activeSessionId: string | null,
   status: RoutineTab["status"],
   relation: WindowRelation,
-  now: Date
+  now: Date,
+  performance: RoutinePerformanceStatDto | undefined
 ): RoutineTab {
   const isActive = preview.sessionId === activeSessionId
   const inactive = status !== "active"
@@ -237,6 +240,7 @@ function toRoutineTab(
     : []
 
   let completionSummary = session ? formatCompletionSummary(session, now) : null
+  const bestDurationSeconds = performance?.bestDurationSeconds ?? null
 
   if (!totalTasks) {
     const durationLabel = session ? formatDuration(session.durationSeconds) : null
@@ -246,6 +250,8 @@ function toRoutineTab(
   return {
     id: preview.sessionId,
     sessionId: preview.sessionId,
+    routineId: preview.routineId,
+    sessionDate: session?.sessionDate ?? preview.startAt?.split("T")[0] ?? "",
     name: preview.name,
     points: preview.pointsAvailable,
     status,
@@ -259,6 +265,10 @@ function toRoutineTab(
     isInProgress,
     successHref: `/child/routines/${preview.sessionId}/success`,
     sessionStatus: session?.status ?? "scheduled",
+    startedAt: session?.startedAt ?? null,
+    plannedEndAt: session?.plannedEndAt ?? null,
+    bestDurationSeconds,
+    bestTimeBeaten: session?.bestTimeBeaten ?? false,
     completedTasks: completedTaskIds.map((taskId) => ({ taskId, completedAt: undefined })),
     mandatoryTaskIds,
   }
@@ -272,6 +282,10 @@ export function buildChildRoutineTabsModel(params: BuildTabsParams): {
   const sessionMap: RoutineSessionLookup = new Map(
     params.sessions.map((session) => [session.id, session])
   )
+  const performanceMap = new Map<string, RoutinePerformanceStatDto>()
+  params.performanceStats?.forEach((stat) => {
+    performanceMap.set(stat.routineId, stat)
+  })
 
   const orderedPreviews = orderPreviews(params.board, null)
   const nowLocalIso = formatDateTimeInTimezone(now, params.timezone)
@@ -280,6 +294,7 @@ export function buildChildRoutineTabsModel(params: BuildTabsParams): {
     const session = sessionMap.get(preview.sessionId)
     const startAt = preview.startAt ?? null
     const endAt = preview.endAt ?? null
+    const performance = performanceMap.get(preview.routineId)
 
     let relation: WindowRelation = "unknown"
     if (startAt && nowLocalIso < startAt) {
@@ -297,7 +312,7 @@ export function buildChildRoutineTabsModel(params: BuildTabsParams): {
       status = relation === "within" || relation === "unknown" ? "active" : "upcoming"
     }
 
-    return { preview, session, relation, status }
+    return { preview, session, relation, status, performance }
   })
 
   let activeAssigned = false
@@ -318,8 +333,8 @@ export function buildChildRoutineTabsModel(params: BuildTabsParams): {
   const activeSessionId = firstActive?.preview.sessionId ?? firstUpcoming?.preview.sessionId ?? fallback?.preview.sessionId ?? null
 
   const tabs = contexts.map((context) => {
-    const { preview, session, relation, status } = context
-    return toRoutineTab(preview, session, activeSessionId, status, relation, now)
+    const { preview, session, relation, status, performance } = context
+    return toRoutineTab(preview, session, activeSessionId, status, relation, now, performance)
   })
 
   const activeTab = tabs.find((tab) => tab.id === activeSessionId)

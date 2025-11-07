@@ -28,6 +28,10 @@ export type ChildProfileFixture = {
   displayName: string
 }
 
+export type ChildProfileDetails = ChildProfileFixture & {
+  pin: string | null
+}
+
 export type ChildAccountFixture = {
   profileId: string
   familyId: string
@@ -352,6 +356,36 @@ export async function deleteChildAccount(account: ChildAccountFixture): Promise<
   await client.auth.admin.deleteUser(account.userId)
 }
 
+export async function listChildProfilesForFamily(
+  familyId: string
+): Promise<ChildProfileDetails[]> {
+  const client = createAdminClient()
+  const { data, error } = await client
+    .from("profiles")
+    .select("id, display_name, settings")
+    .eq("family_id", familyId)
+    .eq("role", "child")
+    .is("deleted_at", null)
+    .order("created_at", { ascending: true })
+
+  if (error) {
+    throw error
+  }
+
+  return (
+    data?.map((row) => {
+      const settings = (row.settings as Record<string, unknown> | null) ?? null
+      const pin =
+        settings && typeof settings.pin_plain === "string" ? (settings.pin_plain as string) : null
+      return {
+        id: row.id,
+        displayName: row.display_name ?? "Dziecko",
+        pin,
+      }
+    }) ?? []
+  )
+}
+
 export async function createSupabaseSessionCookies(
   email: string,
   password: string
@@ -409,6 +443,7 @@ export async function seedChildViewData(
   childProfileId: string
 ): Promise<ChildViewSeedResult> {
   const client = createAdminClient()
+  const toTimeComponent = (date: Date) => date.toISOString().slice(11, 19)
   const now = new Date()
   const today = now.toISOString().slice(0, 10)
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
@@ -563,6 +598,31 @@ export async function seedChildViewData(
     })
   })
 
+  const activeSession = sessionMap.get(morningRoutine.id)
+  if (activeSession) {
+    const windowStart = new Date(now.getTime() - 5 * 60 * 1000)
+    const windowEnd = new Date(now.getTime() + 25 * 60 * 1000)
+
+    await client
+      .from("routines")
+      .update({
+        start_time: toTimeComponent(windowStart),
+        end_time: toTimeComponent(windowEnd),
+      })
+      .eq("id", morningRoutine.id)
+
+    await client
+      .from("routine_sessions")
+      .update({
+        planned_end_at: windowEnd.toISOString(),
+        status: "scheduled",
+        started_at: null,
+        completed_at: null,
+        auto_closed_at: null,
+      })
+      .eq("id", activeSession.id)
+  }
+
   await client.from("routine_performance_stats").insert([
     {
       child_profile_id: childProfileId,
@@ -686,6 +746,144 @@ export async function seedChildViewData(
     },
     streakDays: 5,
   }
+}
+
+type RoutineWindowOptions = {
+  familyId: string
+  childProfileId: string
+  routineType: "morning" | "afternoon" | "evening"
+  startOffsetMinutes?: number
+  durationMinutes?: number
+}
+
+function formatTimeComponent(date: Date): string {
+  return date.toISOString().slice(11, 19)
+}
+
+export async function ensureRoutineSessionWindow(options: RoutineWindowOptions): Promise<string> {
+  const client = createAdminClient()
+  const { familyId, childProfileId, routineType } = options
+  const duration = options.durationMinutes ?? 30
+
+  const now = new Date()
+  const endTime = new Date(now.getTime() + duration * 60 * 1000)
+  const sessionDate = now.toISOString().slice(0, 10)
+
+  const { data: routine, error: routineError } = await client
+    .from("routines")
+    .select("id")
+    .eq("family_id", familyId)
+    .eq("routine_type", routineType)
+    .maybeSingle()
+
+  if (routineError || !routine) {
+    throw routineError ?? new Error(`Routine ${routineType} not found for family ${familyId}`)
+  }
+
+  const { data: existingSession, error: sessionError } = await client
+    .from("routine_sessions")
+    .select("id")
+    .eq("routine_id", routine.id)
+    .eq("child_profile_id", childProfileId)
+    .eq("session_date", sessionDate)
+    .maybeSingle()
+
+  if (sessionError) {
+    throw sessionError
+  }
+
+  let sessionId = existingSession?.id
+
+  if (!sessionId) {
+    const { data: inserted, error: insertError } = await client
+      .from("routine_sessions")
+      .insert({
+        routine_id: routine.id,
+        child_profile_id: childProfileId,
+        session_date: sessionDate,
+        status: "scheduled",
+        planned_end_at: endTime.toISOString(),
+        points_awarded: 0,
+      })
+      .select("id")
+      .maybeSingle()
+
+    if (insertError || !inserted) {
+      throw insertError ?? new Error("Failed to create routine session")
+    }
+
+    sessionId = inserted.id
+  }
+
+  await client
+    .from("routines")
+    .update({
+      start_time: "00:00:00",
+      end_time: "23:59:00",
+    })
+    .eq("id", routine.id)
+
+  await client
+    .from("routine_sessions")
+    .update({
+      planned_end_at: endTime.toISOString(),
+      status: "scheduled",
+      started_at: null,
+      completed_at: null,
+      auto_closed_at: null,
+    })
+    .eq("id", sessionId)
+
+  return sessionId
+}
+
+type RewardOptions = {
+  name?: string
+  description?: string
+  costPoints?: number
+}
+
+export async function ensureRewardForFamily(
+  familyId: string,
+  options: RewardOptions = {}
+): Promise<{ id: string }> {
+  const client = createAdminClient()
+  const { data, error } = await client
+    .from("rewards")
+    .select("id")
+    .eq("family_id", familyId)
+    .is("deleted_at", null)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true })
+    .limit(1)
+
+  if (error) {
+    throw error
+  }
+
+  if (data && data.length > 0) {
+    return { id: data[0]!.id }
+  }
+
+  const { data: reward, error: insertError } = await client
+    .from("rewards")
+    .insert({
+      family_id: familyId,
+      name: options.name ?? "Super nagroda",
+      description: options.description ?? "Nagroda testowa",
+      cost_points: options.costPoints ?? 30,
+      is_repeatable: true,
+      is_active: true,
+      settings: { source: "custom" },
+    })
+    .select("id")
+    .maybeSingle()
+
+  if (insertError || !reward) {
+    throw insertError ?? new Error("Failed to create reward")
+  }
+
+  return { id: reward.id }
 }
 
 export async function updateRoutineWindow(

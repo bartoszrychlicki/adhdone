@@ -50,6 +50,15 @@ export function ChildLoginForm({ className, defaultChildId }: ChildLoginFormProp
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {!defaultChildId ? (
+          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+            <p className="font-semibold text-amber-50">Brak linku logowania</p>
+            <p>
+              Logowanie dziecka zostanie aktywowane, gdy rodzic udostępni dedykowany link z panelu.
+              Poproś opiekuna o przesłanie aktualnego zaproszenia.
+            </p>
+          </div>
+        ) : null}
         <form action={formAction} className="space-y-5" noValidate>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -94,4 +103,3 @@ export function ChildLoginForm({ className, defaultChildId }: ChildLoginFormProp
     </Card>
   )
 }
-

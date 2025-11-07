@@ -39,6 +39,7 @@ export type ChildRoutineSessionViewModel = {
   plannedEndAt: string | null
   completedAt: string | null
   durationSeconds: number | null
+  bestTimeBeaten: boolean
   totalPoints: number
   pointsAwarded: number
   steps: ChildRoutineTask[]
@@ -47,8 +48,11 @@ export type ChildRoutineSessionViewModel = {
 export type ChildRoutineSuccessSummary = {
   routineName: string
   totalTimeMinutes: number
+  totalDurationSeconds: number | null
   pointsEarned: number
   pointsRecord?: number
+  bestDurationSeconds?: number | null
+  bestTimeBeaten: boolean
   badgesUnlocked: Array<{
     id: string
     name: string

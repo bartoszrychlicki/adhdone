@@ -86,7 +86,8 @@ async function insertPointTransaction(
   familyId: string,
   childProfileId: string,
   cost: number,
-  reason: string
+  reason: string,
+  createdByProfileId?: string | null
 ): Promise<{ id: string; balanceAfter: number }> {
   const currentBalance = await fetchChildBalance(client, familyId, childProfileId)
   const newBalance = currentBalance - cost
@@ -100,7 +101,8 @@ async function insertPointTransaction(
       points_delta: -cost,
       reason,
       balance_after: newBalance,
-      metadata: {}
+      metadata: {},
+      created_by_profile_id: createdByProfileId ?? null,
     })
     .select("id, balance_after")
     .maybeSingle()
@@ -120,7 +122,8 @@ export async function createRewardRedemption(
   client: Client,
   rewardId: string,
   familyId: string,
-  command: CreateRewardRedemptionCommand
+  command: CreateRewardRedemptionCommand,
+  createdByProfileId?: string
 ): Promise<RewardRedemptionCreateResultDto> {
   const reward = await fetchReward(client, rewardId)
 
@@ -134,7 +137,8 @@ export async function createRewardRedemption(
     familyId,
     command.childProfileId,
     reward.cost_points,
-    `Redeemed reward ${reward.name}`
+    `Redeemed reward ${reward.name}`,
+    createdByProfileId
   )
 
   const { data, error } = await client

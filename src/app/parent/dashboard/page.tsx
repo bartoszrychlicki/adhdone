@@ -29,7 +29,7 @@ export default async function ParentDashboardPage() {
   }
 
   if (activeProfile.role === "child") {
-    redirect("/child/home")
+    redirect("/child/routines")
   }
 
   const supabase = await createSupabaseServerClient()

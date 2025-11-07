@@ -22,7 +22,7 @@ export default async function ChildLoginPage({ searchParams }: ChildLoginPagePro
   const activeProfile = await getActiveProfile()
 
   if (activeProfile?.role === "child") {
-    redirect("/child/home")
+    redirect("/child/routines")
   }
 
   if (activeProfile?.role === "parent" || activeProfile?.role === "admin") {

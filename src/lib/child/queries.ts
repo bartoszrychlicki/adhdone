@@ -471,6 +471,7 @@ export async function fetchChildRoutineSessionViewModel(
     plannedEndAt: details.plannedEndAt ?? combineDateAndTime(details.sessionDate, routine?.end_time ?? null),
     completedAt: details.completedAt ?? null,
     durationSeconds: details.durationSeconds ?? null,
+    bestTimeBeaten: details.bestTimeBeaten ?? false,
     totalPoints,
     pointsAwarded: details.pointsAwarded ?? 0,
     steps,
@@ -560,6 +561,7 @@ export async function fetchChildRoutineSessionViewModelForChild(
       sessionRow.planned_end_at ?? combineDateAndTime(sessionRow.session_date, (routineRow ?? null)?.end_time ?? null),
     completedAt: sessionRow.completed_at,
     durationSeconds: sessionRow.duration_seconds,
+    bestTimeBeaten: sessionRow.best_time_beaten ?? false,
     totalPoints,
     pointsAwarded: sessionRow.points_awarded ?? 0,
     steps,
@@ -575,6 +577,7 @@ export async function fetchChildRoutineSuccessSummary(
 
   const performance = await listRoutinePerformance(client, session.childProfileId, session.routineId)
   const performanceEntry = performance.data[0]
+  const bestDurationSeconds = performanceEntry?.bestDurationSeconds ?? null
 
   let pointsRecord: number | undefined
   if (performanceEntry?.bestSessionId) {
@@ -660,8 +663,11 @@ export async function fetchChildRoutineSuccessSummary(
   return {
     routineName: session.routineName,
     totalTimeMinutes,
+    totalDurationSeconds: session.durationSeconds ?? null,
     pointsEarned: session.pointsAwarded,
     pointsRecord,
+    bestDurationSeconds,
+    bestTimeBeaten: session.bestTimeBeaten,
     badgesUnlocked: badges,
     nextRoutine,
   }

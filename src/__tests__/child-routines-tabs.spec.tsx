@@ -44,6 +44,8 @@ function buildTabs(overrides: Partial<RoutineTab>[] = []): ChildRoutineTabsProps
     {
       id: "morning",
       sessionId: "session-morning",
+      routineId: "routine-morning",
+      sessionDate: "2025-01-01",
       name: "Poranna",
       points: 120,
       status: "active",
@@ -60,12 +62,18 @@ function buildTabs(overrides: Partial<RoutineTab>[] = []): ChildRoutineTabsProps
       isInProgress: false,
       successHref: "/child/routines/session-morning/success",
       sessionStatus: "scheduled",
+      startedAt: null,
+      plannedEndAt: null,
+      bestDurationSeconds: 540,
+      bestTimeBeaten: false,
       completedTasks: [],
       mandatoryTaskIds: ["brush-teeth", "dress-up"],
     },
     {
       id: "evening",
       sessionId: "session-evening",
+      routineId: "routine-evening",
+      sessionDate: "2025-01-01",
       name: "Wieczorna",
       points: 90,
       status: "upcoming",
@@ -82,12 +90,18 @@ function buildTabs(overrides: Partial<RoutineTab>[] = []): ChildRoutineTabsProps
       isInProgress: false,
       successHref: "/child/routines/session-evening/success",
       sessionStatus: "scheduled",
+      startedAt: null,
+      plannedEndAt: null,
+      bestDurationSeconds: null,
+      bestTimeBeaten: false,
       completedTasks: [],
       mandatoryTaskIds: ["pyjamas", "teeth-night"],
     },
     {
       id: "weekend",
       sessionId: "session-weekend",
+      routineId: "routine-weekend",
+      sessionDate: "2024-12-31",
       name: "Weekendowa",
       points: 60,
       status: "completed",
@@ -104,6 +118,10 @@ function buildTabs(overrides: Partial<RoutineTab>[] = []): ChildRoutineTabsProps
       isInProgress: false,
       successHref: "/child/routines/session-weekend/success",
       sessionStatus: "completed",
+      startedAt: "2024-12-31T08:00:00Z",
+      plannedEndAt: "2024-12-31T08:30:00Z",
+      bestDurationSeconds: 480,
+      bestTimeBeaten: true,
       completedTasks: [
         { taskId: "games", completedAt: "2025-01-01T10:00:00Z" },
         { taskId: "books", completedAt: "2025-01-01T10:05:00Z" },
@@ -120,18 +138,25 @@ function buildTabs(overrides: Partial<RoutineTab>[] = []): ChildRoutineTabsProps
 
 function renderTabs(overrides: Partial<RoutineTab>[] = []) {
   const tabs = buildTabs(overrides)
-  return render(<ChildRoutineTabs tabs={tabs} />)
+  return render(<ChildRoutineTabs tabs={tabs} childId="child-1" familyId="family-1" />)
 }
 
 describe("ChildRoutineTabs spec alignment", () => {
-  it("renders active routine by default with inline tasks and completion action", () => {
+  it("renders active routine with start callout and disabled tasks by default", () => {
     renderTabs()
 
     const activeTab = screen.getByRole("tab", { name: /Poranna \(120 pkt\)/i })
     expect(activeTab).toHaveAttribute("aria-selected", "true")
 
-    expect(screen.getByText("Mycie zębów")).toBeInTheDocument()
-    expect(screen.getByText("Ubierz się")).toBeInTheDocument()
+    expect(screen.getByText("00:00")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Start" })).toBeInTheDocument()
+    expect(screen.getByText(/Rekord: 09:00/)).toBeInTheDocument()
+    expect(screen.getByText("Uruchom timer, aby rozpocząć misję.")).toBeInTheDocument()
+
+    const taskButtons = screen.getAllByRole("button", { name: "Zrobione" })
+    taskButtons.forEach((button) => {
+      expect(button).toBeDisabled()
+    })
 
     const footer = screen.getByRole("region", { name: /panel zakończenia rutyny/i })
     expect(within(footer).getByRole("button", { name: /Zakończ rutynę/i })).toBeDisabled()
@@ -163,15 +188,16 @@ describe("ChildRoutineTabs spec alignment", () => {
   it("locks other tabs while the active routine is in progress", async () => {
     const user = userEvent.setup()
     const tabs = buildTabs([
-      { isInProgress: true },
+      { isInProgress: true, sessionStatus: "in_progress", startedAt: "2025-01-01T06:10:00Z" },
       { isLocked: true },
       {},
     ])
 
-    render(<ChildRoutineTabs tabs={tabs} />)
+    render(<ChildRoutineTabs tabs={tabs} childId="child-1" familyId="family-1" />)
 
     const upcomingTab = screen.getByRole("tab", { name: /Wieczorna \(90 pkt\)/i })
     expect(upcomingTab).toHaveAttribute("aria-disabled", "true")
+    expect(upcomingTab).toHaveAttribute("title", "Zakończ aktualną rutynę, aby zobaczyć pozostałe.")
 
     await user.click(upcomingTab)
 
@@ -179,20 +205,66 @@ describe("ChildRoutineTabs spec alignment", () => {
     expect(activeTab).toHaveAttribute("aria-selected", "true")
   })
 
-  it("allows completing tasks and finishing the active routine", async () => {
+  it("guides the child about remaining mandatory tasks while finishing a routine", async () => {
     const user = userEvent.setup()
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ status: "in_progress", startedAt: "2025-01-01T06:15:00Z" }),
+    })
     renderTabs()
 
-    const getActiveTaskButton = () =>
-      screen.getAllByRole("button", { name: "Zrobione" }).find((button) => !button.hasAttribute("disabled"))
+    await user.click(screen.getByRole("button", { name: "Start" }))
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled())
 
-    const firstTaskButton = getActiveTaskButton()
-    expect(firstTaskButton).toBeDefined()
-    await user.click(firstTaskButton!)
+    const taskButtons = screen.getAllByRole("button", { name: "Zrobione" })
+    await waitFor(() => expect(taskButtons[0]).not.toBeDisabled())
 
-    const secondTaskButton = getActiveTaskButton()
-    expect(secondTaskButton).toBeDefined()
-    await user.click(secondTaskButton!)
+    await user.click(taskButtons[0]!)
+    expect(screen.getByText("Pozostało 1 obowiązkowe zadanie.")).toBeInTheDocument()
+
+    await waitFor(() => expect(taskButtons[1]).not.toBeDisabled())
+    await user.click(taskButtons[1]!)
+    await waitFor(() =>
+      expect(screen.queryByText(/Pozostało 1 obowiązkowe zadanie/)).not.toBeInTheDocument()
+    )
+  })
+
+  it("allows completing tasks and finishing the active routine", async () => {
+    const user = userEvent.setup()
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ status: "in_progress", startedAt: "2025-01-01T06:15:00Z" }),
+    })
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({}) })
+    renderTabs()
+
+    const startButton = screen.getByRole("button", { name: "Start" })
+    await user.click(startButton)
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        "/api/v1/children/child-1/sessions",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "x-debug-family-id": "family-1",
+            "x-debug-profile-id": "child-1",
+            "x-debug-role": "child",
+          }),
+        })
+      )
+    })
+
+    await waitFor(() => {
+      const buttons = screen.getAllByRole("button", { name: "Zrobione" })
+      expect(buttons[0]).not.toBeDisabled()
+    })
+
+    const taskButtons = screen.getAllByRole("button", { name: "Zrobione" })
+    await user.click(taskButtons[0]!)
+    await waitFor(() => expect(taskButtons[1]).not.toBeDisabled())
+    await user.click(taskButtons[1]!)
 
     const finishButton = screen.getByRole("button", { name: /Zakończ rutynę/i })
     expect(finishButton).toBeEnabled()
@@ -200,13 +272,19 @@ describe("ChildRoutineTabs spec alignment", () => {
     await user.click(finishButton)
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
         "/api/v1/sessions/session-morning/complete",
         expect.objectContaining({
           method: "POST",
+          headers: expect.objectContaining({
+            "x-debug-family-id": "family-1",
+            "x-debug-profile-id": "child-1",
+            "x-debug-role": "child",
+          }),
         })
       )
-      const [, options] = fetchMock.mock.calls[0] as [string, RequestInit]
+      const [, options] = fetchMock.mock.calls[1] as [string, RequestInit]
       const payload = JSON.parse((options.body ?? "{}") as string)
       expect(payload.completedTasks).toHaveLength(2)
       expect(pushMock).toHaveBeenCalledWith("/child/routines/session-morning/success")

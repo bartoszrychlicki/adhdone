@@ -28,7 +28,7 @@ export default async function RoutineSessionPage({ params }: RoutineSessionPageP
   }
 
   if (session.childProfileId !== sessionContext.childId) {
-    redirect("/child/home")
+    redirect("/child/routines")
   }
 
   return <RoutineSessionView session={session} sessionId={sessionId} />

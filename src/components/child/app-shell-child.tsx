@@ -33,7 +33,7 @@ export function AppShellChild({
             </div>
             <h1 className="text-3xl font-semibold text-white">Hej, {childName}!</h1>
             <p className="text-sm text-violet-100/80">Masz energię, by sięgnąć po kolejne odznaki. Powodzenia!</p>
-            <PointsBadge points={pointsBalance} />
+            <PointsBadge points={pointsBalance} href="/child/rewards" />
           </div>
           <Button
             variant="ghost"

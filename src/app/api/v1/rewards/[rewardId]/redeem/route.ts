@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../../_lib/authContext"
 import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../../_lib/errors"
 import { ensureUuid } from "../../../../_lib/validation"
@@ -42,6 +42,8 @@ export async function POST(
     const supabase = await createSupabaseServerClient()
 
     const authContext = await requireAuthContext(supabase)
+    const dbClient =
+      authContext.role === "child" ? createSupabaseServiceRoleClient() : supabase
     const familyId = authContext.familyId
     if (!familyId) {
       throw new ForbiddenError("Profile not associated with family")
@@ -59,13 +61,14 @@ export async function POST(
       throw new ForbiddenError("Children can only redeem for themselves")
     }
     await ensureRewardFamily(rewardIdValidated, familyId)
-    await ensureProfileInFamily(supabase, command.childProfileId, familyId)
+    await ensureProfileInFamily(dbClient, command.childProfileId, familyId)
 
     const redemption = await createRewardRedemption(
-      supabase,
+      dbClient,
       rewardIdValidated,
       familyId,
-      command
+      command,
+      authContext.profileId
     )
 
     return NextResponse.json(redemption, { status: 201 })

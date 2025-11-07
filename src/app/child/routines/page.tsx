@@ -2,11 +2,23 @@ import type { Metadata } from "next"
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChildRoutineTabs } from "./components/ChildRoutineTabs"
+import { RoutineMetricsBand } from "./components/RoutineMetricsBand"
 import { buildChildRoutineTabsModel } from "./tab-model"
 import { fetchChildRoutineBoard, fetchChildRoutineSessionViewModelForChild } from "@/lib/child/queries"
 import type { ChildRoutineSessionViewModel } from "@/lib/child/types"
 import { createSupabaseServiceRoleClient } from "@/lib/supabase"
 import { requireChildSession } from "@/lib/auth/child-session"
+import { listRoutinePerformance } from "@/app/api/_services/performanceService"
+
+function getCurrentDateInTimezone(timezone: string): string {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+  return formatter.format(new Date())
+}
 
 export const metadata: Metadata = {
   title: "Lista rutyn",
@@ -41,11 +53,30 @@ export default async function ChildRoutinesPage() {
   )
 
   const sessionsWithData = routineSessions.filter(Boolean) as ChildRoutineSessionViewModel[]
+  const performanceStats = await listRoutinePerformance(supabase, session.childId)
   const { tabs } = buildChildRoutineTabsModel({
     board,
     sessions: sessionsWithData,
     timezone,
+    performanceStats: performanceStats.data,
   })
+
+  const todayDate = getCurrentDateInTimezone(timezone)
+  const availableToday = board.today.length
+  const totalPointsToday = board.today.reduce((sum, preview) => sum + (preview.pointsAvailable ?? 0), 0)
+  const completedToday = sessionsWithData.filter(
+    (item) => item.status === "completed" && item.sessionDate === todayDate
+  ).length
+  const streakDays = performanceStats.data.reduce(
+    (max, stat) => Math.max(max, stat.streakDays ?? 0),
+    0
+  )
+  const heroTotals = {
+    availableToday,
+    totalPointsToday,
+    completedToday,
+    streakDays,
+  }
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -56,6 +87,8 @@ export default async function ChildRoutinesPage() {
           Sprawdź, które misje są dostępne teraz, które rozpoczną się wkrótce i co już udało się ukończyć.
         </p>
       </header>
+
+      <RoutineMetricsBand totals={heroTotals} />
 
       <section className="space-y-4">
         {tabs.length === 0 ? (
@@ -68,7 +101,7 @@ export default async function ChildRoutinesPage() {
             </CardHeader>
           </Card>
         ) : (
-          <ChildRoutineTabs tabs={tabs} />
+          <ChildRoutineTabs tabs={tabs} childId={session.childId} familyId={session.familyId} />
         )}
       </section>
     </div>

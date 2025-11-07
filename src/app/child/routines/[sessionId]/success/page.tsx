@@ -33,6 +33,20 @@ function formatDateTime(value: string | null | undefined) {
   }
 }
 
+function formatDurationLabel(seconds: number | null | undefined, fallbackMinutes: number): string {
+  if (seconds && seconds > 0) {
+    const minutes = Math.floor(seconds / 60)
+    const remainder = seconds % 60
+    return `${minutes.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`
+  }
+
+  if (fallbackMinutes > 0) {
+    return `${fallbackMinutes} min`
+  }
+
+  return "—"
+}
+
 export default async function RoutineSuccessPage({ params }: RoutineSuccessPageProps) {
   const { sessionId } = await params
   const sessionContext = await requireChildSession()
@@ -56,7 +70,12 @@ export default async function RoutineSuccessPage({ params }: RoutineSuccessPageP
               <Trophy className="size-5" aria-hidden />
               Zdobyte punkty
             </CardTitle>
-            <CardDescription className="text-sm text-teal-100/90">Gratulacje! Utrzymujesz serię i bonus.</CardDescription>
+            <CardDescription className="text-sm text-teal-100/90">
+              Gratulacje! Utrzymujesz serię i bonus.
+              {data.pointsRecord ? (
+                <span className="mt-1 block text-xs text-teal-100/70">Rekord punktów: {data.pointsRecord} pkt</span>
+              ) : null}
+            </CardDescription>
           </CardHeader>
           <CardContent className="text-3xl font-semibold text-white">{data.pointsEarned} pkt</CardContent>
         </Card>
@@ -68,12 +87,16 @@ export default async function RoutineSuccessPage({ params }: RoutineSuccessPageP
               Czas rutyny
             </CardTitle>
             <CardDescription className="text-sm text-violet-100/90">
-              {data.pointsRecord
-                ? `Rekord rodziny: ${data.pointsRecord} pkt`
-                : "Brak rekordu do pobicia. Możesz ustanowić swój pierwszy!"}
+              {data.bestTimeBeaten
+                ? "Nowy rekord! To Twój najszybszy czas."
+                : data.bestDurationSeconds
+                  ? `Rekord rodzinny: ${formatDurationLabel(data.bestDurationSeconds, data.totalTimeMinutes)}`
+                  : "To Twój pierwszy zapisany czas dla tej rutyny."}
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-3xl font-semibold text-white">{data.totalTimeMinutes} min</CardContent>
+          <CardContent className="text-3xl font-semibold text-white">
+            {formatDurationLabel(data.totalDurationSeconds, data.totalTimeMinutes)}
+          </CardContent>
         </Card>
       </section>
 
@@ -113,7 +136,7 @@ export default async function RoutineSuccessPage({ params }: RoutineSuccessPageP
               </Link>
             </Button>
             <Button variant="ghost" asChild className="border border-slate-800/80">
-              <Link href="/child/home">Wróć do tablicy rutyn</Link>
+              <Link href="/child/routines">Wróć do tablicy rutyn</Link>
             </Button>
           </CardContent>
         </Card>

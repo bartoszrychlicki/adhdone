@@ -25,7 +25,7 @@ export default async function OnboardingLayout({ children }: OnboardingLayoutPro
   }
 
   if (activeProfile.role === "child") {
-    redirect("/child/home")
+    redirect("/child/routines")
   }
 
   if (activeProfile.role !== "parent" && activeProfile.role !== "admin") {

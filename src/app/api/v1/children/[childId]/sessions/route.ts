@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../../_lib/authContext"
 import {
   ForbiddenError,
@@ -27,6 +27,8 @@ export async function GET(
   try {
     const supabase = await createSupabaseServerClient()
     const authContext = await requireAuthContext(supabase)
+    const dbClient =
+      authContext.role === "child" ? createSupabaseServiceRoleClient() : supabase
 
     const { childId } = await context.params
     const childIdValidated = ensureUuid(childId, "childId")
@@ -39,12 +41,12 @@ export async function GET(
       throw new ForbiddenError("Children can only view their own sessions")
     }
 
-    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
+    await ensureProfileInFamily(dbClient, childIdValidated, authContext.familyId)
 
     const query = parseSessionListQuery(request.nextUrl.searchParams)
     const offset = (query.page - 1) * query.pageSize
 
-    const sessions = await listChildSessions(supabase, {
+    const sessions = await listChildSessions(dbClient, {
       childProfileId: childIdValidated,
       status: query.status,
       fromDate: query.fromDate,
@@ -69,6 +71,8 @@ export async function POST(
   try {
     const supabase = await createSupabaseServerClient()
     const authContext = await requireAuthContext(supabase)
+    const dbClient =
+      authContext.role === "child" ? createSupabaseServiceRoleClient() : supabase
 
     const { childId } = await context.params
     const childIdValidated = ensureUuid(childId, "childId")
@@ -84,12 +88,12 @@ export async function POST(
       throw new ForbiddenError("Children can only start their own sessions")
     }
 
-    await ensureProfileInFamily(supabase, childIdValidated, authContext.familyId)
+    await ensureProfileInFamily(dbClient, childIdValidated, authContext.familyId)
 
     const payload = await readJsonBody(request)
     const command = parseSessionCreatePayload(payload)
 
-    const session = await startRoutineSession(supabase, childIdValidated, command)
+    const session = await startRoutineSession(dbClient, childIdValidated, command)
     return NextResponse.json(session, { status: 201 })
   } catch (error) {
     return handleRouteError(error)

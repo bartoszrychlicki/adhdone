@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase"
 import { requireAuthContext } from "../../../../_lib/authContext"
 import {
   ForbiddenError,
@@ -28,19 +28,21 @@ export async function POST(
     const supabase = await createSupabaseServerClient()
 
     const authContext = await requireAuthContext(supabase)
+    const dbClient =
+      authContext.role === "child" ? createSupabaseServiceRoleClient() : supabase
     const { sessionId } = await context.params
     const sessionIdValidated = ensureUuid(sessionId, "sessionId")
 
     if (!authContext.familyId) {
       throw new ForbiddenError("Profile not associated with family")
     }
-    const session = await getSessionDetails(supabase, sessionIdValidated, {
+    const session = await getSessionDetails(dbClient, sessionIdValidated, {
       includeTasks: false,
       includePerformance: false
     })
 
     await ensureProfileInFamily(
-      supabase,
+      dbClient,
       session.childProfileId,
       authContext.familyId
     )
@@ -56,9 +58,10 @@ export async function POST(
     const command = parseSessionCompletionPayload(payload)
 
     const result = await completeRoutineSession(
-      supabase,
+      dbClient,
       sessionIdValidated,
-      command
+      command,
+      authContext.profileId
     )
 
     return NextResponse.json(result, { status: 200 })

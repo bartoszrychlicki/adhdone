@@ -86,7 +86,7 @@ export default async function OnboardingRewardsPage() {
               <Link href="/parent/dashboard">Wróć do panelu</Link>
             </Button>
             <Button asChild>
-              <Link href="/child/home">Zobacz sklep dziecka</Link>
+              <Link href="/child/rewards">Zobacz sklep dziecka</Link>
             </Button>
           </div>
         </CardContent>

@@ -24,7 +24,7 @@ export default async function Home() {
   }
 
   if (activeProfile?.role === "child") {
-    redirect("/child/home")
+    redirect("/child/routines")
   }
 
   return (

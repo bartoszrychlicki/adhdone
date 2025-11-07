@@ -94,5 +94,5 @@ export async function loginChild(
     displayName: childProfile.display_name,
   })
 
-  redirect("/child/home")
+  redirect("/child/routines")
 }

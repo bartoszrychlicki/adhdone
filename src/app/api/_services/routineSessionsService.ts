@@ -1,4 +1,5 @@
-import { addMinutes } from "date-fns"
+import { addMinutes, differenceInCalendarDays } from "date-fns"
+import { awardAchievement } from "./achievementsService"
 import type { Database } from "@/db/database.types"
 import type {
   CompleteRoutineSessionCommand,
@@ -158,6 +159,163 @@ async function fetchTaskOrder(
   return data.map((row) => ({ taskId: row.id, position: row.position }))
 }
 
+async function fetchChildFamilyId(
+  client: Client,
+  childProfileId: string
+): Promise<string> {
+  const { data, error } = await client
+    .from("profiles")
+    .select("family_id")
+    .eq("id", childProfileId)
+    .maybeSingle()
+
+  if (error) {
+    throw mapSupabaseError(error)
+  }
+
+  if (!data?.family_id) {
+    throw new NotFoundError("Child profile missing family association")
+  }
+
+  return data.family_id
+}
+
+async function fetchTaskPointsMap(
+  client: Client,
+  routineId: string,
+  childProfileId: string
+): Promise<Map<string, number>> {
+  const { data, error } = await client
+    .from("routine_tasks")
+    .select("id, points")
+    .eq("routine_id", routineId)
+    .eq("child_profile_id", childProfileId)
+    .eq("is_active", true)
+    .is("deleted_at", null)
+
+  if (error) {
+    throw mapSupabaseError(error)
+  }
+
+  const map = new Map<string, number>()
+  ;(data ?? []).forEach((row) => {
+    map.set(row.id as string, Number(row.points ?? 0))
+  })
+  return map
+}
+
+async function fetchChildBalance(
+  client: Client,
+  familyId: string,
+  childProfileId: string
+): Promise<number> {
+  const { data, error } = await client
+    .from("point_transactions")
+    .select("points_delta")
+    .eq("family_id", familyId)
+    .eq("profile_id", childProfileId)
+
+  if (error) {
+    throw mapSupabaseError(error)
+  }
+
+  return (data ?? []).reduce((total, row) => total + Number(row.points_delta ?? 0), 0)
+}
+
+async function insertPointTransaction(
+  client: Client,
+  familyId: string,
+  childProfileId: string,
+  amount: number,
+  type: Database["public"]["Enums"]["point_transaction_type"],
+  reason: string,
+  referenceId: string,
+  metadata: Record<string, unknown>,
+  currentBalance: number,
+  createdByProfileId?: string | null
+): Promise<{ id: string; balanceAfter: number }> {
+  const newBalance = currentBalance + amount
+  const { data, error } = await client
+    .from("point_transactions")
+    .insert({
+      family_id: familyId,
+      profile_id: childProfileId,
+      transaction_type: type,
+      points_delta: amount,
+      balance_after: newBalance,
+      reference_id: referenceId,
+      reference_table: "routine_sessions",
+      metadata,
+      reason,
+      created_by_profile_id: createdByProfileId ?? null,
+    })
+    .select("id, balance_after")
+    .maybeSingle()
+
+  if (error) {
+    throw mapSupabaseError(error)
+  }
+
+  if (!data) {
+    throw new ValidationError("Failed to record point transaction")
+  }
+
+  return {
+    id: data.id,
+    balanceAfter: data.balance_after,
+  }
+}
+
+async function findAchievementByCode(
+  client: Client,
+  familyId: string,
+  code: string
+): Promise<string | null> {
+  const { data, error } = await client
+    .from("achievements")
+    .select("id, family_id, deleted_at")
+    .eq("code", code)
+    .or(`family_id.eq.${familyId},family_id.is.null`)
+    .is("deleted_at", null)
+    .order("family_id", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    throw mapSupabaseError(error)
+  }
+
+  return data?.id ?? null
+}
+
+async function awardAchievementsIfAvailable(
+  client: Client,
+  childProfileId: string,
+  familyId: string,
+  achievementCodes: Array<{ code: string; metadata?: Record<string, unknown> }>
+): Promise<void> {
+  for (const entry of achievementCodes) {
+    try {
+      const achievementId = await findAchievementByCode(client, familyId, entry.code)
+      if (!achievementId) {
+        continue
+      }
+      await awardAchievement(client, childProfileId, {
+        achievementId,
+        metadata: entry.metadata ?? {},
+      })
+    } catch (error) {
+      if (error instanceof ConflictError) {
+        continue
+      }
+      console.warn("[RoutineSession] Failed to award achievement", {
+        error,
+        code: entry.code,
+      })
+    }
+  }
+}
+
 export async function startRoutineSession(
   client: Client,
   childProfileId: string,
@@ -181,29 +339,71 @@ export async function startRoutineSession(
       ? addMinutes(now, autoCloseMinutes).toISOString()
       : null
 
-  const insertPayload: RoutineSessionInsert = {
-    routine_id: command.routineId,
-    child_profile_id: childProfileId,
-    session_date: command.sessionDate,
-    status: "in_progress",
-    started_at: now.toISOString(),
-    planned_end_at: plannedEndAt,
-    bonus_multiplier: 1,
-    points_awarded: 0
-  }
-
-  const { data, error } = await client
+  const { data: existingSession, error: existingSessionError } = await client
     .from("routine_sessions")
-    .insert(insertPayload)
     .select("*")
+    .eq("child_profile_id", childProfileId)
+    .eq("routine_id", command.routineId)
+    .eq("session_date", command.sessionDate)
     .maybeSingle()
 
-  if (error) {
-    throw mapSupabaseError(error)
+  if (existingSessionError) {
+    throw mapSupabaseError(existingSessionError)
   }
 
-  if (!data) {
-    throw new NotFoundError("Failed to create routine session")
+  let sessionRow: RoutineSessionRow | null = existingSession ?? null
+
+  if (sessionRow) {
+    const { data: updated, error: updateError } = await client
+      .from("routine_sessions")
+      .update({
+        status: "in_progress",
+        started_at: now.toISOString(),
+        planned_end_at: plannedEndAt ?? sessionRow.planned_end_at,
+        bonus_multiplier: 1,
+        points_awarded: sessionRow.points_awarded ?? 0,
+        auto_closed_at: null,
+      })
+      .eq("id", sessionRow.id)
+      .select("*")
+      .maybeSingle()
+
+    if (updateError) {
+      throw mapSupabaseError(updateError)
+    }
+
+    if (!updated) {
+      throw new NotFoundError("Failed to update routine session")
+    }
+
+    sessionRow = updated
+  } else {
+    const insertPayload: RoutineSessionInsert = {
+      routine_id: command.routineId,
+      child_profile_id: childProfileId,
+      session_date: command.sessionDate,
+      status: "in_progress",
+      started_at: now.toISOString(),
+      planned_end_at: plannedEndAt,
+      bonus_multiplier: 1,
+      points_awarded: 0
+    }
+
+    const { data, error } = await client
+      .from("routine_sessions")
+      .insert(insertPayload)
+      .select("*")
+      .maybeSingle()
+
+    if (error) {
+      throw mapSupabaseError(error)
+    }
+
+    if (!data) {
+      throw new NotFoundError("Failed to create routine session")
+    }
+
+    sessionRow = data
   }
 
   const taskOrder = await fetchTaskOrder(
@@ -213,10 +413,10 @@ export async function startRoutineSession(
   )
 
   return {
-    id: data.id,
-    status: data.status,
-    startedAt: data.started_at,
-    plannedEndAt: data.planned_end_at,
+    id: sessionRow.id,
+    status: sessionRow.status,
+    startedAt: sessionRow.started_at,
+    plannedEndAt: sessionRow.planned_end_at,
     taskOrder
   }
 }
@@ -260,7 +460,7 @@ async function fetchSessionTasks(
 
   const completions = await client
     .from("task_completions")
-    .select("routine_task_id, completed_at, deleted_at")
+    .select("routine_task_id, completed_at")
     .eq("routine_session_id", session.id)
 
   if (completions.error) {
@@ -269,9 +469,7 @@ async function fetchSessionTasks(
 
   const completionMap = new Map<string, TaskCompletionRow>()
   completions.data.forEach((item) => {
-    if (!item.deleted_at) {
-      completionMap.set(item.routine_task_id, item)
-    }
+    completionMap.set(item.routine_task_id, item)
   })
 
   return data.map((task) => {
@@ -405,7 +603,6 @@ async function ensureTaskOrderRespected(
     .select("routine_task_id")
     .eq("routine_session_id", session.id)
     .in("routine_task_id", previousIds)
-    .is("deleted_at", null)
 
   if (completionError) {
     throw mapSupabaseError(completionError)
@@ -425,7 +622,7 @@ export async function completeTaskForSession(
   sessionId: string,
   taskId: string,
   command: TaskCompletionCommand
-): Promise<TaskCompletionRow> {
+): Promise<TaskCompletionRow & { awardedPoints: number }> {
   const session = await ensureSessionWritable(client, sessionId)
   const task = await getTaskContext(client, session, taskId)
   await ensureTaskOrderRespected(client, session, task)
@@ -435,7 +632,6 @@ export async function completeTaskForSession(
     .select("id")
     .eq("routine_session_id", session.id)
     .eq("routine_task_id", taskId)
-    .is("deleted_at", null)
     .maybeSingle()
 
   if (existingError) {
@@ -446,6 +642,8 @@ export async function completeTaskForSession(
     throw new ConflictError("Task already completed")
   }
 
+  const awardedPoints = Number(task.points ?? 0)
+
   const { data, error } = await client
     .from("task_completions")
     .insert({
@@ -453,6 +651,7 @@ export async function completeTaskForSession(
       routine_task_id: taskId,
       completed_at: command.completedAt,
       position: task.position,
+      points_awarded: awardedPoints,
       metadata: command.notes ?? {}
     })
     .select("*")
@@ -466,7 +665,10 @@ export async function completeTaskForSession(
     throw new NotFoundError("Failed to record task completion")
   }
 
-  return data
+  return {
+    ...(data as TaskCompletionRow),
+    awardedPoints,
+  }
 }
 
 export async function undoTaskCompletion(
@@ -478,12 +680,9 @@ export async function undoTaskCompletion(
 
   const { data, error } = await client
     .from("task_completions")
-    .update({
-      deleted_at: new Date().toISOString()
-    })
+    .delete()
     .eq("id", completionId)
     .eq("routine_session_id", session.id)
-    .is("deleted_at", null)
     .select("id")
     .maybeSingle()
 
@@ -499,9 +698,20 @@ export async function undoTaskCompletion(
 export async function completeRoutineSession(
   client: Client,
   sessionId: string,
-  command: CompleteRoutineSessionCommand
+  command: CompleteRoutineSessionCommand,
+  actorProfileId?: string
 ): Promise<RoutineSessionCompletionDto> {
   const session = await ensureSessionWritable(client, sessionId)
+  const familyId = await fetchChildFamilyId(client, session.child_profile_id)
+  const taskPointsMap = await fetchTaskPointsMap(client, session.routine_id, session.child_profile_id)
+
+  const uniqueCompletedTaskIds = new Set(command.completedTasks.map((task) => task.taskId))
+  let basePoints = 0
+  uniqueCompletedTaskIds.forEach((taskId) => {
+    const points = taskPointsMap.get(taskId) ?? 0
+    basePoints += points
+  })
+  const normalizedBasePoints = Math.max(0, Math.round(basePoints))
 
   for (const entry of command.completedTasks) {
     try {
@@ -539,13 +749,52 @@ export async function completeRoutineSession(
       )
     : null
 
+  const { data: previousCompletedRow, error: previousCompletedError } = await client
+    .from("routine_sessions")
+    .select("session_date")
+    .eq("child_profile_id", session.child_profile_id)
+    .eq("routine_id", session.routine_id)
+    .eq("status", "completed")
+    .lt("session_date", session.session_date)
+    .order("session_date", { ascending: false })
+    .limit(1)
+    .maybeSingle<{ session_date: string }>()
+
+  if (previousCompletedError) {
+    throw mapSupabaseError(previousCompletedError)
+  }
+
+  const { data: performanceRow, error: performanceError } = await client
+    .from("routine_performance_stats")
+    .select("best_duration_seconds, best_session_id, streak_days")
+    .eq("child_profile_id", session.child_profile_id)
+    .eq("routine_id", session.routine_id)
+    .maybeSingle()
+
+  if (performanceError) {
+    throw mapSupabaseError(performanceError)
+  }
+
+  const previousBest = performanceRow?.best_duration_seconds ?? null
+  const hasDuration = typeof durationSeconds === "number" && durationSeconds > 0
+  const currentDuration = hasDuration ? (durationSeconds as number) : null
+  const bestTimeBeaten =
+    currentDuration !== null && typeof previousBest === "number" && previousBest > 0
+      ? currentDuration < previousBest
+      : false
+
+  const bonusMultiplier = bestTimeBeaten ? 2 : 1
+  const totalPointsAwarded = normalizedBasePoints * bonusMultiplier
+
   const { data, error } = await client
     .from("routine_sessions")
     .update({
       status: "completed",
       completed_at: completedAtIso,
       duration_seconds: durationSeconds,
-      best_time_beaten: command.bestTimeBeaten ?? false,
+      best_time_beaten: bestTimeBeaten,
+      points_awarded: totalPointsAwarded,
+      bonus_multiplier: bonusMultiplier,
       updated_at: new Date().toISOString()
     })
     .eq("id", sessionId)
@@ -560,13 +809,135 @@ export async function completeRoutineSession(
     throw new NotFoundError("Session not found")
   }
 
+  const nowIso = new Date().toISOString()
+
+  const previousSessionDate = previousCompletedRow?.session_date ?? null
+  let streakDays = 1
+  if (previousSessionDate) {
+    const prevDate = new Date(previousSessionDate)
+    const currentDate = new Date(session.session_date)
+    const diff = differenceInCalendarDays(currentDate, prevDate)
+    if (diff === 1) {
+      streakDays = (performanceRow?.streak_days ?? 0) + 1
+    } else if (diff === 0) {
+      streakDays = performanceRow?.streak_days ?? 1
+    }
+  }
+
+  const nextBestDuration =
+    currentDuration !== null &&
+    (previousBest === null || previousBest <= 0 || currentDuration < previousBest)
+      ? currentDuration
+      : previousBest
+
+  const nextBestSessionId =
+    currentDuration !== null && nextBestDuration === currentDuration
+      ? session.id
+      : performanceRow?.best_session_id ?? null
+
+  const upsertPayload = {
+    child_profile_id: session.child_profile_id,
+    routine_id: session.routine_id,
+    best_duration_seconds: nextBestDuration,
+    best_session_id: nextBestSessionId,
+    last_completed_session_id: session.id,
+    streak_days: streakDays,
+    updated_at: nowIso
+  }
+
+  const { error: upsertError } = await client
+    .from("routine_performance_stats")
+    .upsert(upsertPayload, { onConflict: "child_profile_id,routine_id" })
+
+  if (upsertError) {
+    throw mapSupabaseError(upsertError)
+  }
+
+  let currentBalance = await fetchChildBalance(client, familyId, session.child_profile_id)
+  let baseTransactionId: string | null = null
+
+  if (normalizedBasePoints > 0) {
+    const baseTx = await insertPointTransaction(
+      client,
+      familyId,
+      session.child_profile_id,
+      normalizedBasePoints,
+      "task_completion",
+      `Punkty za rutynę ${session.routine_id}`,
+      session.id,
+      {
+        routineId: session.routine_id,
+        sessionDate: session.session_date,
+        bonus: false,
+      },
+      currentBalance,
+      actorProfileId
+    )
+    baseTransactionId = baseTx.id
+    currentBalance = baseTx.balanceAfter
+  }
+
+  if (bestTimeBeaten && normalizedBasePoints > 0) {
+    const bonusTx = await insertPointTransaction(
+      client,
+      familyId,
+      session.child_profile_id,
+      normalizedBasePoints,
+      "routine_bonus",
+      `Bonus za rekord czasowy (${session.routine_id})`,
+      session.id,
+      {
+        routineId: session.routine_id,
+        sessionDate: session.session_date,
+        bonus: true,
+      },
+      currentBalance,
+      actorProfileId
+    )
+    currentBalance = bonusTx.balanceAfter
+  }
+
+  const achievementsToAward: Array<{ code: string; metadata?: Record<string, unknown> }> = []
+  if (!previousSessionDate) {
+    achievementsToAward.push({
+      code: "first_routine",
+      metadata: { sessionId: session.id, routineId: session.routine_id },
+    })
+  }
+  if (bestTimeBeaten && normalizedBasePoints > 0) {
+    achievementsToAward.push({
+      code: "speedster",
+      metadata: {
+        sessionId: session.id,
+        routineId: session.routine_id,
+        durationSeconds: currentDuration,
+      },
+    })
+  }
+  if (streakDays >= 3) {
+    achievementsToAward.push({
+      code: "streak_3",
+      metadata: { sessionId: session.id, streakDays },
+    })
+  }
+  if (streakDays >= 7) {
+    achievementsToAward.push({
+      code: "streak_7",
+      metadata: { sessionId: session.id, streakDays },
+    })
+  }
+
+  if (achievementsToAward.length > 0) {
+    await awardAchievementsIfAvailable(client, session.child_profile_id, familyId, achievementsToAward)
+  }
+
   return {
     status: data.status,
     completedAt: data.completed_at,
     durationSeconds: data.duration_seconds,
     pointsAwarded: data.points_awarded,
     bonusMultiplier: data.bonus_multiplier,
-    pointTransactionId: null
+    pointTransactionId: baseTransactionId
   }
 }
 

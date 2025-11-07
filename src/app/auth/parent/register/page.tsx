@@ -20,7 +20,7 @@ export default async function ParentRegisterPage() {
   }
 
   if (activeProfile?.role === "child") {
-    redirect("/child/home")
+    redirect("/child/routines")
   }
 
   return (

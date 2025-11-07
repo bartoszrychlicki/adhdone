@@ -16,7 +16,8 @@ test.describe("Parent child preview", () => {
     await page.getByRole("link", { name: /Wejdź jako dziecko/i }).first().click()
 
     await expect(page).toHaveURL(`/parent/children/${childProfile.id}/preview`)
-    await expect(page.getByText("Podgląd interfejsu dziecka")).toBeVisible()
+    const previewAlert = page.getByRole("alert").filter({ hasText: "Podgląd interfejsu dziecka" }).first()
+    await expect(previewAlert).toBeVisible()
     await expect(page.getByText(new RegExp(childProfile.displayName, "i")).first()).toBeVisible()
     await expect(page.getByRole("link", { name: "Powrót do panelu rodzica" })).toBeVisible()
   })

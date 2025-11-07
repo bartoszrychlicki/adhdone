@@ -17,13 +17,12 @@ test.describe("Authenticated child experience", () => {
       displayName: childAccountAuth.displayName,
     })
 
-    await page.goto("/child/home")
+    await page.goto("/child/routines")
 
-    await expect(page.getByRole("heading", { name: "Wybierz, co robimy teraz" })).toBeVisible()
+    await expect(page.getByRole("heading", { name: "Pełny harmonogram dnia" })).toBeVisible()
     await expect(page.getByText(childSeedData.routines.today.name)).toBeVisible()
     await expect(page.getByText(childSeedData.routines.upcoming.name)).toBeVisible()
     await expect(page.getByText(childSeedData.routines.completed.name)).toBeVisible()
-    await expect(page.getByText("Ukończone rutyny")).toBeVisible()
   })
 
   test("summarises routine stats and lists available missions", async ({
@@ -57,6 +56,11 @@ test.describe("Authenticated child experience", () => {
       hasText: "Już ukończone",
     })
     await expect(completedCard.first()).toContainText(String(childSeedData.routines.totals.completedToday))
+
+    const streakCard = page.locator("div").filter({
+      hasText: "Aktualna seria",
+    })
+    await expect(streakCard.first()).toContainText(`${childSeedData.streakDays} dni`)
 
     await expect(page.getByText(childSeedData.routines.today.name)).toBeVisible()
     await expect(page.getByText(childSeedData.routines.upcoming.name)).toBeVisible()

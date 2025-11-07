@@ -62,7 +62,7 @@ export default async function ParentSettingsPage() {
   }
 
   if (activeProfile.role === "child") {
-    redirect("/child/home")
+    redirect("/child/routines")
   }
 
   if (!activeProfile.familyId) {

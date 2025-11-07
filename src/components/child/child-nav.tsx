@@ -20,7 +20,7 @@ const navItems: NavItem[] = [
     label: "Rutyny",
     icon: <Rows className="size-5" aria-hidden />,
     isActive: (pathname) =>
-      pathname === "/child" || pathname.startsWith("/child/home") || pathname.startsWith("/child/routines"),
+      pathname === "/child" || pathname.startsWith("/child/routines"),
   },
   {
     href: "/child/rewards",

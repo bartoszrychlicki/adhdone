@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+import { SessionTimer } from "@/components/child/session-timer"
+import type { RoutineSessionStartDto } from "@/types"
 
 export type RoutineTaskStatus = "pending" | "completed"
 
@@ -27,6 +29,8 @@ export type RoutineTabStatus = "active" | "upcoming" | "completed"
 export type RoutineTab = {
   id: string
   sessionId: string
+  routineId: string
+  sessionDate: string
   name: string
   points: number
   status: RoutineTabStatus
@@ -40,12 +44,18 @@ export type RoutineTab = {
   isInProgress: boolean
   successHref: string
   sessionStatus: string
+  startedAt: string | null
+  plannedEndAt: string | null
+  bestDurationSeconds: number | null
+  bestTimeBeaten: boolean
   completedTasks: Array<{ taskId: string; completedAt?: string | null }>
   mandatoryTaskIds: string[]
 }
 
 export type ChildRoutineTabsProps = {
   tabs: RoutineTab[]
+  childId: string
+  familyId: string
   onSelectTab?: (id: string) => void
 }
 
@@ -55,9 +65,47 @@ function getInitialTabId(tabs: RoutineTab[]): string {
   return current?.id ?? tabs[0]!.id
 }
 
-export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
+type SessionMeta = {
+  status: string
+  startedAt: string | null
+  plannedEndAt: string | null
+}
+
+function createSessionMeta(tabs: RoutineTab[]): Record<string, SessionMeta> {
+  return Object.fromEntries(
+    tabs.map((tab) => [
+      tab.id,
+      {
+        status: tab.sessionStatus,
+        startedAt: tab.startedAt,
+        plannedEndAt: tab.plannedEndAt,
+      },
+    ])
+  )
+}
+
+function formatBestDuration(seconds: number | null): string {
+  if (!seconds || seconds <= 0) {
+    return "Brak rekordu"
+  }
+
+  const minutes = Math.floor(seconds / 60)
+  const remainder = seconds % 60
+  return `${minutes.toString().padStart(2, "0")}:${remainder.toString().padStart(2, "0")}`
+}
+
+function buildAuthHeaders(profileId: string, familyId: string) {
+  return {
+    "x-debug-profile-id": profileId,
+    "x-debug-family-id": familyId,
+    "x-debug-role": "child",
+  }
+}
+
+export function ChildRoutineTabs({ tabs, childId, familyId, onSelectTab }: ChildRoutineTabsProps) {
   const router = useRouter()
   const [selectedId, setSelectedId] = useState(() => getInitialTabId(tabs))
+  const [sessionMeta, setSessionMeta] = useState<Record<string, SessionMeta>>(() => createSessionMeta(tabs))
   const [completionState, setCompletionState] = useState<Record<string, Record<string, string | null>>>(() =>
     Object.fromEntries(
       tabs.map((tab) => [tab.id, Object.fromEntries(tab.completedTasks.map((entry) => [entry.taskId, entry.completedAt ?? null]))])
@@ -68,6 +116,8 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
   )
   const [finishPending, setFinishPending] = useState<Record<string, boolean>>({})
   const [errorState, setErrorState] = useState<Record<string, string | null>>({})
+  const [startPending, setStartPending] = useState<Record<string, boolean>>({})
+  const [startErrors, setStartErrors] = useState<Record<string, string | null>>({})
 
   useEffect(() => {
     if (!tabs.length) {
@@ -82,6 +132,10 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
       setSelectedId(getInitialTabId(tabs))
     }
   }, [tabs, selectedId])
+
+  useEffect(() => {
+    setSessionMeta(createSessionMeta(tabs))
+  }, [tabs])
 
   useEffect(() => {
     const initialCompletion = Object.fromEntries(
@@ -124,13 +178,24 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
     )
   }
 
-  const activeTabInProgress = Boolean(selectedTab?.isInProgress)
+  const activeSessionStatus = sessionMeta[selectedId]?.status ?? selectedTab?.sessionStatus ?? "scheduled"
+  const activeTabInProgress = activeSessionStatus === "in_progress"
 
   const handleTabChange = (nextId: string) => {
     setSelectedId(nextId)
   }
 
   const markTaskCompleted = (tab: RoutineTab, taskId: string) => {
+    const meta = sessionMeta[tab.id] ?? {
+      status: tab.sessionStatus,
+      startedAt: tab.startedAt,
+      plannedEndAt: tab.plannedEndAt,
+    }
+
+    if ((meta.status ?? tab.sessionStatus) !== "in_progress") {
+      return
+    }
+
     setCompletionState((prev) => {
       const tabState = prev[tab.id] ?? {}
       if (tabState[taskId]) {
@@ -147,16 +212,34 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
     setErrorState((prev) => ({ ...prev, [tab.id]: null }))
   }
 
-  const handleFinishRoutine = async (tab: RoutineTab, allMandatoryCompleted: boolean, completionEntries: Array<{ taskId: string; completedAt: string | null }>) => {
+  const handleFinishRoutine = async (
+    tab: RoutineTab,
+    allMandatoryCompleted: boolean,
+    completionEntries: Array<{ taskId: string; completedAt: string | null }>
+  ) => {
     if (tab.status !== "active") {
       return
     }
 
-    const alreadyCompleted = routineCompleted[tab.id] || tab.sessionStatus === "completed"
+    const meta = sessionMeta[tab.id] ?? {
+      status: tab.sessionStatus,
+      startedAt: tab.startedAt,
+      plannedEndAt: tab.plannedEndAt,
+    }
+    const sessionStatus = meta.status ?? tab.sessionStatus
+    const alreadyCompleted = routineCompleted[tab.id] || sessionStatus === "completed"
 
     if (alreadyCompleted) {
       router.push(tab.successHref)
       router.refresh()
+      return
+    }
+
+    if (sessionStatus !== "in_progress") {
+      setErrorState((prev) => ({
+        ...prev,
+        [tab.id]: "Aby zakończyć misję, najpierw uruchom timer.",
+      }))
       return
     }
 
@@ -179,22 +262,35 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
           taskId: entry.taskId,
           completedAt: entry.completedAt ?? new Date().toISOString(),
         })),
-        bestTimeBeaten: false,
       }
 
       const response = await fetch(`/api/v1/sessions/${tab.sessionId}/complete`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          ...buildAuthHeaders(childId, familyId),
         },
         body: JSON.stringify(payload),
       })
 
       if (!response.ok) {
-        throw new Error("Nie udało się zakończyć rutyny.")
+        const errorBody = await response.json().catch(() => null)
+        const message =
+          (errorBody && typeof errorBody?.error?.message === "string"
+            ? errorBody.error.message
+            : null) ?? "Nie udało się zakończyć rutyny."
+        throw new Error(message)
       }
 
       setRoutineCompleted((prev) => ({ ...prev, [tab.id]: true }))
+      setSessionMeta((prev) => ({
+        ...prev,
+        [tab.id]: {
+          status: "completed",
+          startedAt: prev[tab.id]?.startedAt ?? meta.startedAt,
+          plannedEndAt: prev[tab.id]?.plannedEndAt ?? meta.plannedEndAt,
+        },
+      }))
       router.push(tab.successHref)
       router.refresh()
     } catch (error) {
@@ -204,6 +300,62 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
       }))
     } finally {
       setFinishPending((prev) => ({ ...prev, [tab.id]: false }))
+  }
+}
+
+  const handleStartRoutine = async (tab: RoutineTab) => {
+    const meta = sessionMeta[tab.id] ?? {
+      status: tab.sessionStatus,
+      startedAt: tab.startedAt,
+      plannedEndAt: tab.plannedEndAt,
+    }
+
+    if (meta.status === "in_progress") {
+      return
+    }
+
+    setStartPending((prev) => ({ ...prev, [tab.id]: true }))
+    setStartErrors((prev) => ({ ...prev, [tab.id]: null }))
+
+    try {
+      const payload = {
+        routineId: tab.routineId,
+        sessionDate: tab.sessionDate,
+        autoStartTimer: true,
+      }
+
+      const response = await fetch(`/api/v1/children/${childId}/sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders(childId, familyId),
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        throw new Error("Nie udało się rozpocząć rutyny.")
+      }
+
+      const data = (await response.json()) as RoutineSessionStartDto
+
+      setSessionMeta((prev) => ({
+        ...prev,
+        [tab.id]: {
+          status: data.status ?? "in_progress",
+          startedAt: data.startedAt ?? new Date().toISOString(),
+          plannedEndAt: data.plannedEndAt ?? meta.plannedEndAt,
+        },
+      }))
+
+      router.refresh()
+    } catch (error) {
+      setStartErrors((prev) => ({
+        ...prev,
+        [tab.id]: error instanceof Error ? error.message : "Nie udało się rozpocząć rutyny.",
+      }))
+    } finally {
+      setStartPending((prev) => ({ ...prev, [tab.id]: false }))
     }
   }
 
@@ -212,8 +364,16 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
       <Tabs value={selectedId} onValueChange={handleTabChange}>
         <TabsList aria-label="Wybierz rutynę" className="flex-wrap gap-2 bg-slate-950/40">
           {tabs.map((tab) => {
+            const meta = sessionMeta[tab.id] ?? {
+              status: tab.sessionStatus,
+              startedAt: tab.startedAt,
+              plannedEndAt: tab.plannedEndAt,
+            }
             const isSelected = tab.id === selectedId
-            const shouldLock = tab.isLocked || (activeTabInProgress && !isSelected)
+            const tabStatus = meta.status ?? tab.sessionStatus
+            const tabInProgress = tabStatus === "in_progress"
+            const shouldLock = !isSelected && (tab.isLocked || activeTabInProgress || tabInProgress)
+            const lockMessage = "Zakończ aktualną rutynę, aby zobaczyć pozostałe."
 
             return (
               <TabsTrigger
@@ -222,6 +382,7 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
                 disabled={shouldLock}
                 aria-disabled={shouldLock ? "true" : "false"}
                 aria-label={`${tab.name} (${tab.points} pkt)`}
+                title={shouldLock ? lockMessage : undefined}
                 className={cn(
                   "flex min-w-[200px] flex-col items-start gap-1 rounded-2xl border border-transparent px-5 py-3 text-left transition",
                   "data-[state=active]:border-teal-500/70 data-[state=active]:bg-slate-900 data-[state=inactive]:bg-slate-900/30",
@@ -247,26 +408,89 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
         </TabsList>
 
         {tabs.map((tab) => {
+          const meta = sessionMeta[tab.id] ?? {
+            status: tab.sessionStatus,
+            startedAt: tab.startedAt,
+            plannedEndAt: tab.plannedEndAt,
+          }
           const completionMap = completionState[tab.id] ?? {}
           const completedSet = new Set(Object.keys(completionMap))
           const orderedTasks = tab.tasks
-          const firstIncompleteIndex = orderedTasks.findIndex((task) => !completedSet.has(task.id))
-          const activeIndex = firstIncompleteIndex === -1 ? null : firstIncompleteIndex
           const hasTasks = orderedTasks.length > 0
+          const sessionStatus = meta.status ?? tab.sessionStatus
+          const sessionStarted = sessionStatus === "in_progress"
+          const routineIsCompleted = routineCompleted[tab.id] || sessionStatus === "completed"
+          const firstIncompleteIndex = sessionStarted
+            ? orderedTasks.findIndex((task) => !completedSet.has(task.id))
+            : -1
+          const activeIndex = firstIncompleteIndex === -1 ? null : firstIncompleteIndex
           const allMandatoryCompleted = tab.mandatoryTaskIds.every((taskId) => completedSet.has(taskId))
-          const routineIsCompleted = routineCompleted[tab.id] || tab.sessionStatus === "completed"
+          const remainingMandatory = tab.mandatoryTaskIds.filter((taskId) => !completedSet.has(taskId)).length
           const finishDisabled = routineIsCompleted
             ? Boolean(finishPending[tab.id])
-            : tab.status !== "active" || finishPending[tab.id] || !allMandatoryCompleted
+            : tab.status !== "active" || !sessionStarted || finishPending[tab.id] || !allMandatoryCompleted
 
           const completionEntries = Array.from(completedSet).map((taskId) => ({
             taskId,
             completedAt: completionMap[taskId] ?? null,
           }))
 
+          const showStartCallout = tab.status === "active" && !sessionStarted && !routineIsCompleted
+          const bestDurationLabel = formatBestDuration(tab.bestDurationSeconds)
+          let finishHelper: string | null = null
+          if (!routineIsCompleted) {
+            if (!sessionStarted) {
+              finishHelper = "Uruchom timer, aby rozpocząć misję."
+            } else if (remainingMandatory > 0) {
+              finishHelper =
+                remainingMandatory === 1
+                  ? "Pozostało 1 obowiązkowe zadanie."
+                  : `Pozostało ${remainingMandatory} obowiązkowe zadania.`
+            }
+          }
+
           return (
             <TabsContent key={tab.id} value={tab.id}>
               <div className="flex flex-col gap-6">
+                {tab.status === "active" ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <SessionTimer startedAt={meta.startedAt ?? undefined} plannedEndAt={meta.plannedEndAt ?? undefined} />
+                      <div className="flex flex-col gap-1 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-xs text-emerald-100">
+                        <span className="text-sm font-semibold text-white">Rekord: {bestDurationLabel}</span>
+                        {routineIsCompleted && tab.bestTimeBeaten ? (
+                          <span>Ostatnia misja pobiła rekord czasu!</span>
+                        ) : (
+                          <span>Spróbuj pobić swój najlepszy wynik.</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {showStartCallout ? (
+                  <Card className="border-teal-400/40 bg-teal-500/10 text-teal-50">
+                    <CardContent className="flex flex-col gap-4 py-4">
+                      <div className="text-sm">
+                        Aby zacząć tę misję, kliknij „Start”. Timer uruchomi się automatycznie i nie będzie można go zatrzymać.
+                      </div>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                        <Button
+                          type="button"
+                          onClick={() => handleStartRoutine(tab)}
+                          disabled={startPending[tab.id]}
+                          className="sm:w-auto"
+                        >
+                          {startPending[tab.id] ? "Uruchamiam..." : "Start"}
+                        </Button>
+                        {startErrors[tab.id] ? (
+                          <p className="text-sm text-rose-100/90">{startErrors[tab.id]}</p>
+                        ) : null}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : null}
+
                 {tab.availabilityMessage && (
                   <Card className="border-indigo-400/40 bg-indigo-500/10 text-indigo-50">
                     <CardContent className="py-4 text-sm">{tab.availabilityMessage}</CardContent>
@@ -295,10 +519,10 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
                     {hasTasks ? (
                       orderedTasks.map((task, index) => {
                         const isCompleted = completedSet.has(task.id) || task.status === "completed"
-                        const isInactive = tab.status !== "active"
-                        const isActiveTask = !isInactive && activeIndex === index
+                        const isInactive = tab.status !== "active" || !sessionStarted
+                        const isActiveTask = sessionStarted && !isInactive && activeIndex === index
                         const disableAction =
-                          isInactive || isCompleted || (activeIndex !== null && index !== activeIndex)
+                          isInactive || isCompleted || startPending[tab.id] || (activeIndex !== null && index !== activeIndex)
 
                         return (
                           <li
@@ -373,6 +597,9 @@ export function ChildRoutineTabs({ tabs, onSelectTab }: ChildRoutineTabsProps) {
                       >
                         {routineIsCompleted ? "Przejdź dalej" : "Zakończ rutynę"}
                       </Button>
+                      {finishHelper ? (
+                        <p className="text-sm text-slate-300">{finishHelper}</p>
+                      ) : null}
                       {errorState[tab.id] ? (
                         <p className="text-sm text-rose-200/90">{errorState[tab.id]}</p>
                       ) : null}

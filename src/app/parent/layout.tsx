@@ -21,7 +21,7 @@ export default async function ParentLayout({ children }: ParentLayoutProps) {
   }
 
   if (activeProfile.role === "child") {
-    redirect("/child/home")
+    redirect("/child/routines")
   }
 
   let onboardingComplete = false
