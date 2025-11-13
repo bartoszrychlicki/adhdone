@@ -2,12 +2,25 @@ import { describe, expect, it } from "vitest"
 
 import { getChildWallet } from "@/app/api/_services/walletService"
 
-type SupabaseResponse = {
-  data?: unknown
+type SupabaseResponse<T = unknown> = {
+  data?: T
   error?: { message: string } | null
 }
 
-function createSupabaseStub(responses: Record<string, SupabaseResponse[]>): Record<string, unknown> {
+type SupabaseQueryBuilder = {
+  select: () => SupabaseQueryBuilder
+  eq: () => SupabaseQueryBuilder
+  order: () => SupabaseQueryBuilder
+  limit: () => SupabaseQueryBuilder
+  in: () => SupabaseQueryBuilder
+  maybeSingle: () => Promise<SupabaseResponse>
+  then: (
+    onFulfilled: (value: SupabaseResponse) => void,
+    onRejected?: (reason: unknown) => void
+  ) => Promise<void>
+}
+
+function createSupabaseStub(responses: Record<string, SupabaseResponse[]>): { from: (table: string) => SupabaseQueryBuilder } {
   const queues = new Map<string, SupabaseResponse[]>(Object.entries(responses))
 
   const buildResponse = (table: string) => {
@@ -17,29 +30,16 @@ function createSupabaseStub(responses: Record<string, SupabaseResponse[]>): Reco
     return payload
   }
 
-  const createBuilder = (table: string) => {
-    const builder: Record<string, any> = {
-      select() {
-        return builder
-      },
-      eq() {
-        return builder
-      },
-      order() {
-        return builder
-      },
-      limit() {
-        return builder
-      },
-      in() {
-        return builder
-      },
-      maybeSingle() {
-        return Promise.resolve(buildResponse(table))
-      },
-      then(onFulfilled: (value: SupabaseResponse) => void, onRejected?: (reason: unknown) => void) {
-        return Promise.resolve(buildResponse(table)).then(onFulfilled, onRejected)
-      },
+  const createBuilder = (table: string): SupabaseQueryBuilder => {
+    const builder: SupabaseQueryBuilder = {
+      select: () => builder,
+      eq: () => builder,
+      order: () => builder,
+      limit: () => builder,
+      in: () => builder,
+      maybeSingle: () => Promise.resolve(buildResponse(table)),
+      then: (onFulfilled, onRejected) =>
+        Promise.resolve(buildResponse(table)).then(onFulfilled, onRejected),
     }
     return builder
   }
