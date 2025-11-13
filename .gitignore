@@ -46,4 +46,3 @@ next-env.d.ts
 
 # local reward assets generated during onboarding
 public/images/rewards/
-src/data/reward-templates.ts
