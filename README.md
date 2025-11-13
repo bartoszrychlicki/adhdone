@@ -10,6 +10,7 @@
 - [5. Project Scope](#5-project-scope)
 - [6. Project Status](#6-project-status)
 - [7. License](#7-license)
+- [8. Product Documentation](#8-product-documentation)
 
 ## 1. Project Description
 Eryk’s Routine Journal is a mobile-first web app that gamifies daily chores for an 11-year-old. The child interface highlights the active task within morning, afternoon, and evening routines, adds a non-stop timer, and rewards fast completion with bonus points, achievements, and a rewards shop. A companion parent panel lets caregivers configure routines, manage task and reward catalogs, and review progress dashboards, easing the burden of constant reminders. The architecture is designed to scale to multiple children and guardians.
@@ -84,3 +85,13 @@ The project is in active development, transitioning from product specification t
 
 ## 7. License
 The license is not yet specified. All rights reserved until an explicit license is added to the repository.
+
+## 8. Product Documentation
+Planning artifacts live in the hidden `.ai/` directory for AI collaboration, but you can open them locally just like any other Markdown file:
+
+- [Product Requirements Document](.ai/prd.md) – personas, user stories, and success metrics.
+- [API Plan](.ai/api-plan.md) – proposed endpoints, payloads, and security notes.
+- [Database Plan](.ai/db-plan.md) – entity list plus migration considerations.
+- [Tech Stack Notes](.ai/tech-stack.md) – architectural decisions and trade-offs.
+- [UI Plan](.ai/ui-plan.md) – component-level UX direction and states.
+- [View Implementation Plan](.ai/view-implementation-plan.md) – work breakdown for upcoming screens.
