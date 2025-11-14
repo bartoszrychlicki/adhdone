@@ -19,7 +19,7 @@ async function ensureRewardBelongsToFamily(
   familyId: string
 ): Promise<void> {
   const supabase = await createSupabaseServerClient()
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("rewards")
     .select("family_id")
     .eq("id", rewardIdValidated)

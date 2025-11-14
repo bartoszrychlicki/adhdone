@@ -4,6 +4,7 @@ import { AuthApiError, type User } from "@supabase/supabase-js"
 import { redirect } from "next/navigation"
 
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase"
+import type { Database } from "@/db/database.types"
 
 type LoginState =
   | { status: "idle" }
@@ -59,8 +60,11 @@ async function ensureParentProfile(user: User | null) {
   }
 
   const serviceClient = createSupabaseServiceRoleClient()
+  const serviceClientUntyped = serviceClient as any
 
-  const { data: existingProfile, error: fetchError } = await serviceClient
+  type ParentProfileRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "family_id">
+
+  const { data: existingProfileRaw, error: fetchError } = await serviceClientUntyped
     .from("profiles")
     .select("id, family_id")
     .eq("auth_user_id", user.id)
@@ -70,6 +74,8 @@ async function ensureParentProfile(user: User | null) {
     console.error("[ensureParentProfile] Failed to check existing profile", fetchError)
     return
   }
+
+  const existingProfile = (existingProfileRaw as ParentProfileRow | null) ?? null
 
   if (existingProfile?.family_id) {
     return
@@ -83,7 +89,7 @@ async function ensureParentProfile(user: User | null) {
   let familyId = existingProfile?.family_id ?? null
 
   if (!familyId) {
-    const { data: newFamily, error: familyError } = await serviceClient
+    const { data: newFamilyRaw, error: familyError } = await serviceClientUntyped
       .from("families")
       .insert({
         family_name: `Rodzina ${displayName}`,
@@ -98,6 +104,9 @@ async function ensureParentProfile(user: User | null) {
       .select("id")
       .maybeSingle()
 
+    type FamilyRow = Pick<Database["public"]["Tables"]["families"]["Row"], "id">
+    const newFamily = (newFamilyRaw as FamilyRow | null) ?? null
+
     if (familyError || !newFamily) {
       console.error("[ensureParentProfile] Failed to create family", familyError)
       return
@@ -106,7 +115,7 @@ async function ensureParentProfile(user: User | null) {
     familyId = newFamily.id
   }
 
-  const { error: profileInsertError } = await serviceClient.from("profiles").insert({
+  const { error: profileInsertError } = await serviceClientUntyped.from("profiles").insert({
     auth_user_id: user.id,
     display_name: displayName,
     email: user.email,

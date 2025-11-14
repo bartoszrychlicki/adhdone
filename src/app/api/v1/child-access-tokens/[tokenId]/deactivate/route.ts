@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServerClient, type Database } from "@/lib/supabase"
 import {
   assertParentOrAdmin,
   requireAuthContext
@@ -25,13 +25,13 @@ export async function POST(
 ): Promise<Response> {
   try {
     const supabase = await createSupabaseServerClient()
+    const supabaseUntyped = supabase as any
     const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
     const { tokenId } = await context.params
     const tokenIdValidated = ensureUuid(tokenId, "tokenId")
-
-    const { data, error } = await supabase
+    const { data, error } = await supabaseUntyped
       .from("child_access_tokens")
       .select("profile_id")
       .eq("id", tokenIdValidated)
@@ -41,15 +41,22 @@ export async function POST(
       throw mapSupabaseError(error)
     }
 
-    if (!data) {
+    const row = (data as Database["public"]["Tables"]["child_access_tokens"]["Row"] | null) ?? null
+
+    if (!row) {
       throw new ForbiddenError("Token not found")
     }
 
-    await ensureProfileInFamily(supabase, data.profile_id, authContext.familyId)
+    const familyId = authContext.familyId
+    if (!familyId) {
+      throw new ForbiddenError("Profile not associated with family")
+    }
+
+    await ensureProfileInFamily(supabase, row.profile_id, familyId)
 
     const result = await deactivateToken(
       supabase,
-      data.profile_id,
+      row.profile_id,
       tokenIdValidated,
       authContext.profileId
     )
