@@ -24,8 +24,28 @@ type Client = AppSupabaseClient
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
 type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"]
+type ProfileSelfRow = Pick<
+  ProfileRow,
+  |
+    "id"
+    | "family_id"
+    | "role"
+    | "display_name"
+    | "email"
+    | "avatar_url"
+    | "settings"
+    | "last_login_at"
+    | "created_at"
+    | "pin_failed_attempts"
+    | "pin_lock_expires_at"
+    | "deleted_at"
+>
+type ProfileListRow = Pick<
+  ProfileRow,
+  "id" | "role" | "display_name" | "email" | "avatar_url" | "deleted_at" | "last_login_at"
+>
 
-function mapProfile(row: ProfileRow): ProfileSelfDto {
+function mapProfile(row: ProfileSelfRow): ProfileSelfDto {
   return {
     id: row.id,
     familyId: row.family_id,
@@ -43,7 +63,7 @@ function mapProfile(row: ProfileRow): ProfileSelfDto {
   }
 }
 
-function mapProfileListItem(row: ProfileRow): ProfileListItemDto {
+function mapProfileListItem(row: ProfileListRow): ProfileListItemDto {
   return {
     id: row.id,
     role: row.role,
