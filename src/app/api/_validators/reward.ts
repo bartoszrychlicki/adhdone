@@ -295,7 +295,7 @@ export function parseUpdateRedemptionPayload(
   }
 
   const command: UpdateRewardRedemptionCommand = {
-    status
+    status: status as UpdateRewardRedemptionCommand["status"]
   }
 
   if (Object.prototype.hasOwnProperty.call(record, "notes")) {
