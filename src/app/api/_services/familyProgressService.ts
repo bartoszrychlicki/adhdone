@@ -3,7 +3,8 @@ import type {
   FamilyProgressChildSummaryDto,
   FamilyProgressHistoryListDto,
   FamilyProgressRoutineSummaryDto,
-  FamilyProgressSummaryDto
+  FamilyProgressSummaryDto,
+  FamilyProgressTaskSummaryDto
 } from "@/types"
 import { mapSupabaseError } from "../_lib/errors"
 import type { AppSupabaseClient } from "../_lib/types"
@@ -105,7 +106,7 @@ async function fetchTasksForSessions(
         const completion = completionsBySession
           .get(session.id)
           ?.get(task.id)
-        const status: FamilyProgressChildSummaryDto["tasks"][number]["status"] = completion
+        const status: FamilyProgressTaskSummaryDto["status"] = completion
           ? "completed"
           : "pending"
         return {
