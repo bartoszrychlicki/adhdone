@@ -365,15 +365,15 @@ export async function updateProfilePin(
 
   const pinHash = hashPin(command.pin)
 
-  const existingSettings = (profile.settings ?? {}) as Record<string, unknown>
-  let settingsPayload: Record<string, unknown> | undefined
+  const existingSettings = (profile.settings ?? {}) as Record<string, Json>
+  let settingsPayload: Json | undefined
 
   if (command.storePlainPin) {
-    settingsPayload = { ...existingSettings, pin_plain: command.pin }
+    settingsPayload = { ...existingSettings, pin_plain: command.pin } as Json
   } else if (Object.prototype.hasOwnProperty.call(existingSettings, "pin_plain")) {
     const nextSettings = { ...existingSettings }
     delete nextSettings.pin_plain
-    settingsPayload = nextSettings
+    settingsPayload = nextSettings as Json
   }
 
   const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
