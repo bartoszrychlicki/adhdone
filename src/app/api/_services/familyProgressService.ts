@@ -105,10 +105,13 @@ async function fetchTasksForSessions(
         const completion = completionsBySession
           .get(session.id)
           ?.get(task.id)
+        const status: FamilyProgressChildSummaryDto["tasks"][number]["status"] = completion
+          ? "completed"
+          : "pending"
         return {
           taskId: task.id,
           name: task.name,
-          status: completion ? "completed" : "pending",
+          status,
           completedAt: completion ?? undefined
         }
       })
