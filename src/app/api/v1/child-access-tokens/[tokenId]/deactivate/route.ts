@@ -25,13 +25,12 @@ export async function POST(
 ): Promise<Response> {
   try {
     const supabase = await createSupabaseServerClient()
-    const supabaseUntyped = supabase as any
     const authContext = await requireAuthContext(supabase)
     assertParentOrAdmin(authContext)
 
     const { tokenId } = await context.params
     const tokenIdValidated = ensureUuid(tokenId, "tokenId")
-    const { data, error } = await supabaseUntyped
+    const { data, error } = await supabase
       .from("child_access_tokens")
       .select("profile_id")
       .eq("id", tokenIdValidated)

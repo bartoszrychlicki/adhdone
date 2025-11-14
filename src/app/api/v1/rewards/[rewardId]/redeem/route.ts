@@ -13,8 +13,7 @@ async function ensureRewardFamily(
   familyId: string
 ): Promise<void> {
   const supabase = await createSupabaseServerClient()
-  const supabaseUntyped = supabase as any
-  const { data, error } = await supabaseUntyped
+  const { data, error } = await supabase
     .from("rewards")
     .select("family_id")
     .eq("id", rewardIdValidated)

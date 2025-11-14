@@ -60,11 +60,10 @@ async function ensureParentProfile(user: User | null) {
   }
 
   const serviceClient = createSupabaseServiceRoleClient()
-  const serviceClientUntyped = serviceClient as any
 
   type ParentProfileRow = Pick<Database["public"]["Tables"]["profiles"]["Row"], "id" | "family_id">
 
-  const { data: existingProfileRaw, error: fetchError } = await serviceClientUntyped
+  const { data: existingProfileRaw, error: fetchError } = await serviceClient
     .from("profiles")
     .select("id, family_id")
     .eq("auth_user_id", user.id)
@@ -89,7 +88,7 @@ async function ensureParentProfile(user: User | null) {
   let familyId = existingProfile?.family_id ?? null
 
   if (!familyId) {
-    const { data: newFamilyRaw, error: familyError } = await serviceClientUntyped
+    const { data: newFamilyRaw, error: familyError } = await serviceClient
       .from("families")
       .insert({
         family_name: `Rodzina ${displayName}`,
@@ -115,7 +114,7 @@ async function ensureParentProfile(user: User | null) {
     familyId = newFamily.id
   }
 
-  const { error: profileInsertError } = await serviceClientUntyped.from("profiles").insert({
+  const { error: profileInsertError } = await serviceClient.from("profiles").insert({
     auth_user_id: user.id,
     display_name: displayName,
     email: user.email,

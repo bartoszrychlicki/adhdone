@@ -13,8 +13,7 @@ async function ensureRedemptionFamily(
   familyId: string
 ): Promise<string> {
   const supabase = await createSupabaseServerClient()
-  const supabaseUntyped = supabase as any
-  const { data, error } = await supabaseUntyped
+  const { data, error } = await supabase
     .from("reward_redemptions")
     .select("child_profile_id, rewards:rewards!inner(family_id)")
     .eq("id", redemptionIdValidated)

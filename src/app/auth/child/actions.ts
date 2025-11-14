@@ -56,14 +56,13 @@ export async function loginChild(
   const childId = childIdRaw.trim()
 
   const supabase = createSupabaseServiceRoleClient()
-  const supabaseUntyped = supabase as any
 
   type ChildProfileRow = Pick<
     Database["public"]["Tables"]["profiles"]["Row"],
     "id" | "family_id" | "display_name" | "role" | "deleted_at" | "settings"
   >
 
-  const { data: childProfileRaw, error } = await supabaseUntyped
+  const { data: childProfileRaw, error } = await supabase
     .from("profiles")
     .select("id, family_id, display_name, role, deleted_at, settings")
     .eq("id", childId)
