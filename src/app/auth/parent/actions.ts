@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 
 import { createSupabaseServerClient, createSupabaseServiceRoleClient } from "@/lib/supabase"
 import type { Database } from "@/db/database.types"
+import { getAppBaseUrl } from "@/lib/env"
 
 type LoginState =
   | { status: "idle" }
@@ -37,11 +38,8 @@ function validatePassword(value: FormDataEntryValue | null): string | null {
 }
 
 function resolveEmailRedirect(): string | undefined {
-  const appUrl =
-    process.env.NEXT_PUBLIC_APP_URL ?? process.env.SITE_URL ?? "http://localhost:3000"
-
   try {
-    const url = new URL(appUrl)
+    const url = new URL(getAppBaseUrl())
     url.pathname = "/auth/parent/confirm"
     return url.toString()
   } catch {
