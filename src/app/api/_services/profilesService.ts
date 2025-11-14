@@ -44,17 +44,6 @@ type ProfileListRow = Pick<
   ProfileRow,
   "id" | "role" | "display_name" | "email" | "avatar_url" | "deleted_at" | "last_login_at"
 >
-type ProfilePinRow = Pick<
-  ProfileRow,
-  |
-    "id"
-    | "family_id"
-    | "role"
-    | "settings"
-    | "pin_failed_attempts"
-    | "pin_lock_expires_at"
-    | "deleted_at"
->
 
 function mapProfile(row: ProfileSelfRow): ProfileSelfDto {
   return {
@@ -315,20 +304,10 @@ export async function updateProfile(
 async function fetchProfileRow(
   client: Client,
   profileId: string
-): Promise<ProfilePinRow> {
+): Promise<ProfileRow> {
   const { data, error } = await client
     .from("profiles")
-    .select(
-      `
-        id,
-        family_id,
-        role,
-        settings,
-        pin_failed_attempts,
-        pin_lock_expires_at,
-        deleted_at
-      `
-    )
+    .select("*")
     .eq("id", profileId)
     .maybeSingle()
 
@@ -340,7 +319,7 @@ async function fetchProfileRow(
     throw new NotFoundError("Profile not found")
   }
 
-  return data as ProfilePinRow
+  return data as ProfileRow
 }
 
 export async function updateProfilePin(
