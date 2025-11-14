@@ -540,8 +540,7 @@ export async function getSessionDetails(
         bestSessionId: data.best_session_id,
         lastCompletedSessionId: data.last_completed_session_id,
         lastCompletedAt: data.last_completed_at,
-        streakDays: data.streak_days,
-        updatedAt: session.updated_at
+        streakDays: data.streak_days
       }
     }
   }
