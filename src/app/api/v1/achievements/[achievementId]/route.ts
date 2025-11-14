@@ -1,6 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
 import { createSupabaseServerClient } from "@/lib/supabase"
-import type { Database } from "@/db/database.types"
 import { assertParentOrAdmin, requireAuthContext } from "../../../_lib/authContext"
 import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../_lib/errors"
 import { ensureUuid } from "../../../_lib/validation"
@@ -13,9 +12,8 @@ async function ensureAchievementFamily(
   familyId: string
 ): Promise<void> {
   const supabase = await createSupabaseServerClient()
-  const ACHIEVEMENTS_TABLE: keyof Database["public"]["Tables"] = "achievements"
   const { data, error } = await supabase
-    .from(ACHIEVEMENTS_TABLE)
+    .from<Database["public"]["Tables"]["achievements"]["Row"]>("achievements")
     .select("family_id")
     .eq("id", achievementId)
     .maybeSingle()
