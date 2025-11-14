@@ -348,7 +348,7 @@ export function parseCreateAchievementPayload(
     code,
     name,
     description,
-    criteria: record.criteria as Record<string, unknown>,
+    criteria: record.criteria as Json,
     iconUrl
   }
 }
@@ -383,7 +383,7 @@ export function parseUpdateAchievementPayload(
     if (!record.criteria || typeof record.criteria !== "object") {
       throw new ValidationError("criteria must be an object")
     }
-    command.criteria = record.criteria as Record<string, unknown>
+    command.criteria = record.criteria as Json
   }
 
   if (Object.prototype.hasOwnProperty.call(record, "iconUrl")) {
