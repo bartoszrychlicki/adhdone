@@ -220,7 +220,7 @@ export function parseRedeemPayload(
     typeof record.notes === "string" ? record.notes : undefined
   const metadata =
     record.metadata && typeof record.metadata === "object"
-      ? (record.metadata as Record<string, unknown>)
+      ? (record.metadata as Json)
       : undefined
 
   return {
