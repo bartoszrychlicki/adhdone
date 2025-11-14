@@ -904,7 +904,7 @@ export async function completeRoutineSession(
     currentBalance = bonusTx.balanceAfter
   }
 
-  const achievementsToAward: Array<{ code: string; metadata?: Record<string, unknown> }> = []
+  const achievementsToAward: Array<{ code: string; metadata?: Json }> = []
   if (!previousSessionDate) {
     achievementsToAward.push({
       code: "first_routine",
