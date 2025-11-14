@@ -471,8 +471,11 @@ async function fetchSessionTasks(
     throw mapSupabaseError(completions.error)
   }
 
-  const completionMap = new Map<string, TaskCompletionRow>()
-  completions.data.forEach((item) => {
+  type CompletionRow = Pick<TaskCompletionRow, "routine_task_id" | "completed_at">
+  const completionRows = (completions.data ?? []) as CompletionRow[]
+
+  const completionMap = new Map<string, CompletionRow>()
+  completionRows.forEach((item) => {
     completionMap.set(item.routine_task_id, item)
   })
 
