@@ -198,7 +198,7 @@ export function parseVisibilityPayload(
     visibleUntil: visibleUntil ?? null,
     metadata:
       record.metadata && typeof record.metadata === "object"
-        ? (record.metadata as Record<string, unknown>)
+        ? (record.metadata as Json)
         : undefined
   }
 }
