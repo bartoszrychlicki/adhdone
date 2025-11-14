@@ -267,3 +267,15 @@ export async function loginParent(
   console.log("[loginParent] login success, redirecting")
   redirect("/parent/dashboard")
 }
+
+export async function logoutParent(): Promise<void> {
+  const supabase = await createSupabaseServerClient({ allowCookiePersistence: true })
+
+  try {
+    await supabase.auth.signOut({ scope: "global" })
+  } catch (error) {
+    console.error("[logoutParent] Failed to sign out", error)
+  }
+
+  redirect("/auth/parent?status=logged_out")
+}
