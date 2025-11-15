@@ -72,7 +72,7 @@ jobs:
 
       - name: Create env files
         run: |
-          cat <<'EOF' > .env.local
+          cat <<EOF > .env.local
           NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
           NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
           SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
@@ -80,7 +80,7 @@ jobs:
           PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY=$PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY
           EOF
 
-          cat <<'EOF' > .env.development.local
+          cat <<EOF > .env.development.local
           NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
           NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
           SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY
