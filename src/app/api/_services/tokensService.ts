@@ -16,6 +16,7 @@ import type { AppSupabaseClient } from "../_lib/types"
 type Client = AppSupabaseClient
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
+type ChildProfileRow = Pick<ProfileRow, "id" | "role" | "deleted_at">
 
 function generateToken(): string {
   return randomBytes(24).toString("base64url")
@@ -24,7 +25,7 @@ function generateToken(): string {
 async function getChildProfile(
   client: Client,
   profileId: string
-): Promise<ProfileRow> {
+): Promise<ChildProfileRow> {
   const { data, error } = await client
     .from("profiles")
     .select(`id, role, deleted_at`)
@@ -43,7 +44,7 @@ async function getChildProfile(
     throw new ForbiddenError("Tokens can only be issued for child profiles")
   }
 
-  return data
+  return data as ChildProfileRow
 }
 
 export async function deactivateActiveTokens(
@@ -116,10 +117,7 @@ export async function listChildAccessTokens(
 
   const query = client
     .from("child_access_tokens")
-    .select(
-      `id, profile_id, token, created_at, last_used_at, deactivated_at`,
-      { order: { ascending: false, column: "created_at" } }
-    )
+    .select(`id, profile_id, token, created_at, last_used_at, deactivated_at`)
     .eq("profile_id", profileId)
     .order("created_at", { ascending: false })
 

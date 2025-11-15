@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import { createSupabaseServerClient } from "@/lib/supabase"
+import { createSupabaseServerClient, type Database } from "@/lib/supabase"
 import { assertParentOrAdmin, requireAuthContext } from "../../../_lib/authContext"
 import { ForbiddenError, handleRouteError, mapSupabaseError } from "../../../_lib/errors"
 import { ensureUuid } from "../../../_lib/validation"
@@ -22,11 +22,13 @@ async function ensureAchievementFamily(
     throw mapSupabaseError(error)
   }
 
-  if (!data) {
+  const row = (data as Database["public"]["Tables"]["achievements"]["Row"] | null) ?? null
+
+  if (!row) {
     throw new ForbiddenError("Achievement not found")
   }
 
-  if (data.family_id && data.family_id !== familyId) {
+  if (row.family_id && row.family_id !== familyId) {
     throw new ForbiddenError("Achievement does not belong to this family")
   }
 }

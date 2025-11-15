@@ -3,7 +3,8 @@ import type {
   FamilyProgressChildSummaryDto,
   FamilyProgressHistoryListDto,
   FamilyProgressRoutineSummaryDto,
-  FamilyProgressSummaryDto
+  FamilyProgressSummaryDto,
+  FamilyProgressTaskSummaryDto
 } from "@/types"
 import { mapSupabaseError } from "../_lib/errors"
 import type { AppSupabaseClient } from "../_lib/types"
@@ -53,7 +54,7 @@ async function fetchDailySessions(
 
 async function fetchTasksForSessions(
   client: Client,
-  sessions: Database["public"]["Tables"]["routine_sessions"]["Row"]
+  sessions: Database["public"]["Tables"]["routine_sessions"]["Row"][]
 ): Promise<Map<string, FamilyProgressChildSummaryDto["tasks"]>> {
   const sessionIds = sessions.map((session) => session.id)
   if (sessionIds.length === 0) {
@@ -105,10 +106,13 @@ async function fetchTasksForSessions(
         const completion = completionsBySession
           .get(session.id)
           ?.get(task.id)
+        const status: FamilyProgressTaskSummaryDto["status"] = completion
+          ? "completed"
+          : "pending"
         return {
           taskId: task.id,
           name: task.name,
-          status: completion ? "completed" : "pending",
+          status,
           completedAt: completion ?? undefined
         }
       })

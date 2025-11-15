@@ -1,3 +1,4 @@
+import type { Json } from "@/db/database.types"
 import type {
   AwardAchievementCommand,
   CreateAchievementCommand,
@@ -99,7 +100,7 @@ export function parseCreateRewardPayload(
     typeof record.description === "string" ? record.description : undefined
   const settings =
     record.settings && typeof record.settings === "object"
-      ? (record.settings as Record<string, unknown>)
+      ? (record.settings as Json)
       : undefined
 
   return {
@@ -152,7 +153,7 @@ export function parseUpdateRewardPayload(
     if (record.settings && typeof record.settings !== "object") {
       throw new ValidationError("settings must be an object")
     }
-    command.settings = record.settings as Record<string, unknown>
+    command.settings = record.settings as Json
   }
 
   if (Object.prototype.hasOwnProperty.call(record, "deletedAt")) {
@@ -197,7 +198,7 @@ export function parseVisibilityPayload(
     visibleUntil: visibleUntil ?? null,
     metadata:
       record.metadata && typeof record.metadata === "object"
-        ? (record.metadata as Record<string, unknown>)
+        ? (record.metadata as Json)
         : undefined
   }
 }
@@ -219,7 +220,7 @@ export function parseRedeemPayload(
     typeof record.notes === "string" ? record.notes : undefined
   const metadata =
     record.metadata && typeof record.metadata === "object"
-      ? (record.metadata as Record<string, unknown>)
+      ? (record.metadata as Json)
       : undefined
 
   return {
@@ -294,7 +295,7 @@ export function parseUpdateRedemptionPayload(
   }
 
   const command: UpdateRewardRedemptionCommand = {
-    status
+    status: status as UpdateRewardRedemptionCommand["status"]
   }
 
   if (Object.prototype.hasOwnProperty.call(record, "notes")) {
@@ -347,7 +348,7 @@ export function parseCreateAchievementPayload(
     code,
     name,
     description,
-    criteria: record.criteria as Record<string, unknown>,
+    criteria: record.criteria as Json,
     iconUrl
   }
 }
@@ -382,7 +383,7 @@ export function parseUpdateAchievementPayload(
     if (!record.criteria || typeof record.criteria !== "object") {
       throw new ValidationError("criteria must be an object")
     }
-    command.criteria = record.criteria as Record<string, unknown>
+    command.criteria = record.criteria as Json
   }
 
   if (Object.prototype.hasOwnProperty.call(record, "iconUrl")) {
@@ -433,7 +434,7 @@ export function parseAwardAchievementPayload(
 
   const metadata =
     record.metadata && typeof record.metadata === "object"
-      ? (record.metadata as Record<string, unknown>)
+      ? (record.metadata as Json)
       : undefined
 
   return {

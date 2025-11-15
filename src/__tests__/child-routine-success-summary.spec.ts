@@ -16,41 +16,38 @@ import { listChildAchievements } from "@/app/api/_services/achievementsService"
 const mockedListRoutinePerformance = vi.mocked(listRoutinePerformance)
 const mockedListChildAchievements = vi.mocked(listChildAchievements)
 
-type SupabaseResponse = {
-  data?: any
+type SupabaseResponse<T = unknown> = {
+  data?: T
   error?: { message: string } | null
 }
 
-function createSupabaseStub(responses: Record<string, SupabaseResponse[]>): Record<string, unknown> {
+type SupabaseQueryBuilder = {
+  select: () => SupabaseQueryBuilder
+  eq: () => SupabaseQueryBuilder
+  gt: () => SupabaseQueryBuilder
+  in: () => SupabaseQueryBuilder
+  order: () => SupabaseQueryBuilder
+  limit: () => SupabaseQueryBuilder
+  neq: () => SupabaseQueryBuilder
+  maybeSingle: () => Promise<SupabaseResponse>
+}
+
+function createSupabaseStub(responses: Record<string, SupabaseResponse[]>): { from: (table: string) => SupabaseQueryBuilder } {
   const state = new Map<string, SupabaseResponse[]>(
     Object.entries(responses).map(([table, entries]) => [table, [...entries]])
   )
 
   return {
     from(table: string) {
-      const chain = {
-        select() {
-          return chain
-        },
-        eq() {
-          return chain
-        },
-        gt() {
-          return chain
-        },
-        in() {
-          return chain
-        },
-        order() {
-          return chain
-        },
-        limit() {
-          return chain
-        },
-        neq() {
-          return chain
-        },
-        maybeSingle() {
+      const chain: SupabaseQueryBuilder = {
+        select: () => chain,
+        eq: () => chain,
+        gt: () => chain,
+        in: () => chain,
+        order: () => chain,
+        limit: () => chain,
+        neq: () => chain,
+        maybeSingle: () => {
           const queue = state.get(table) ?? []
           const response = queue.shift() ?? { data: null, error: null }
           state.set(table, queue)
@@ -92,6 +89,8 @@ describe("fetchChildRoutineSuccessSummary", () => {
     mockedListRoutinePerformance.mockResolvedValue({
       data: [
         {
+          routineId: "routine-1",
+          childProfileId: "child-1",
           bestDurationSeconds: 120,
           bestSessionId: "record-session",
           lastCompletedSessionId: "session-1",
@@ -110,6 +109,7 @@ describe("fetchChildRoutineSuccessSummary", () => {
           description: "Finish fast",
           iconUrl: null,
           awardedAt: "2025-01-01T07:05:00Z",
+          metadata: {}
         },
       ],
     })
@@ -149,6 +149,8 @@ describe("fetchChildRoutineSuccessSummary", () => {
     mockedListRoutinePerformance.mockResolvedValue({
       data: [
         {
+          routineId: "routine-1",
+          childProfileId: "child-1",
           bestDurationSeconds: 140,
           bestSessionId: "record-session",
           lastCompletedSessionId: "session-9",
@@ -167,6 +169,7 @@ describe("fetchChildRoutineSuccessSummary", () => {
           description: null,
           iconUrl: null,
           awardedAt: "2024-12-31T12:00:00Z",
+          metadata: {}
         },
       ],
     })

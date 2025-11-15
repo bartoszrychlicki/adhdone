@@ -1,6 +1,6 @@
 import { addMinutes, differenceInCalendarDays } from "date-fns"
 import { awardAchievement } from "./achievementsService"
-import type { Database } from "@/db/database.types"
+import type { Database, Json } from "@/db/database.types"
 import type {
   CompleteRoutineSessionCommand,
   RoutineSessionChildSummaryDto,
@@ -292,7 +292,7 @@ async function awardAchievementsIfAvailable(
   client: Client,
   childProfileId: string,
   familyId: string,
-  achievementCodes: Array<{ code: string; metadata?: Record<string, unknown> }>
+  achievementCodes: Array<{ code: string; metadata?: Json }>
 ): Promise<void> {
   for (const entry of achievementCodes) {
     try {
@@ -302,7 +302,7 @@ async function awardAchievementsIfAvailable(
       }
       await awardAchievement(client, childProfileId, {
         achievementId,
-        metadata: entry.metadata ?? {},
+        metadata: (entry.metadata ?? {}) as Json,
       })
     } catch (error) {
       if (error instanceof ConflictError) {
@@ -406,6 +406,10 @@ export async function startRoutineSession(
     sessionRow = data
   }
 
+  if (!sessionRow) {
+    throw new NotFoundError("Failed to initialize routine session")
+  }
+
   const taskOrder = await fetchTaskOrder(
     client,
     command.routineId,
@@ -467,9 +471,14 @@ async function fetchSessionTasks(
     throw mapSupabaseError(completions.error)
   }
 
-  const completionMap = new Map<string, TaskCompletionRow>()
-  completions.data.forEach((item) => {
-    completionMap.set(item.routine_task_id, item)
+  type CompletionRow = Pick<TaskCompletionRow, "routine_task_id" | "completed_at">
+  const completionRows = (completions.data ?? []) as CompletionRow[]
+
+  const completionMap = new Map<string, CompletionRow>()
+  completionRows.forEach((item) => {
+    if (item.routine_task_id) {
+      completionMap.set(item.routine_task_id, item)
+    }
   })
 
   return data.map((task) => {
@@ -527,13 +536,11 @@ export async function getSessionDetails(
     if (data) {
       details.performance = {
         routineId: data.routine_id,
-        childProfileId: data.child_profile_id,
         bestDurationSeconds: data.best_duration_seconds,
         bestSessionId: data.best_session_id,
         lastCompletedSessionId: data.last_completed_session_id,
         lastCompletedAt: data.last_completed_at,
-        streakDays: data.streak_days,
-        updatedAt: session.updated_at
+        streakDays: data.streak_days
       }
     }
   }
@@ -897,7 +904,7 @@ export async function completeRoutineSession(
     currentBalance = bonusTx.balanceAfter
   }
 
-  const achievementsToAward: Array<{ code: string; metadata?: Record<string, unknown> }> = []
+  const achievementsToAward: Array<{ code: string; metadata?: Json }> = []
   if (!previousSessionDate) {
     achievementsToAward.push({
       code: "first_routine",

@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync } from "crypto"
-import type { Database } from "@/db/database.types"
+import type { Database, Json } from "@/db/database.types"
 import type {
   CreateChildProfileCommand,
   ProfileCreatedDto,
@@ -24,8 +24,28 @@ type Client = AppSupabaseClient
 
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
 type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"]
+type ProfileSelfRow = Pick<
+  ProfileRow,
+  |
+    "id"
+    | "family_id"
+    | "role"
+    | "display_name"
+    | "email"
+    | "avatar_url"
+    | "settings"
+    | "last_login_at"
+    | "created_at"
+    | "pin_failed_attempts"
+    | "pin_lock_expires_at"
+    | "deleted_at"
+>
+type ProfileListRow = Pick<
+  ProfileRow,
+  "id" | "role" | "display_name" | "email" | "avatar_url" | "deleted_at" | "last_login_at"
+>
 
-function mapProfile(row: ProfileRow): ProfileSelfDto {
+function mapProfile(row: ProfileSelfRow): ProfileSelfDto {
   return {
     id: row.id,
     familyId: row.family_id,
@@ -43,7 +63,7 @@ function mapProfile(row: ProfileRow): ProfileSelfDto {
   }
 }
 
-function mapProfileListItem(row: ProfileRow): ProfileListItemDto {
+function mapProfileListItem(row: ProfileListRow): ProfileListItemDto {
   return {
     id: row.id,
     role: row.role,
@@ -170,14 +190,14 @@ function buildInsertPayload(
     email: command.email ?? null,
     avatar_url: command.avatarUrl ?? null,
     settings: (() => {
-      const baseSettings = (command.settings ?? {}) as Record<string, unknown>
-      const nextSettings: Record<string, unknown> = { ...baseSettings }
+      const baseSettings = (command.settings ?? {}) as Record<string, Json>
+      const nextSettings: Record<string, Json> = { ...baseSettings }
 
       if (typeof command.pin === "string" && command.pin.length > 0) {
         nextSettings.pin_plain = command.pin
       }
 
-      return nextSettings
+      return nextSettings as Json
     })(),
     pin_failed_attempts: 0,
     pin_lock_expires_at: null
@@ -287,17 +307,7 @@ async function fetchProfileRow(
 ): Promise<ProfileRow> {
   const { data, error } = await client
     .from("profiles")
-    .select(
-      `
-        id,
-        family_id,
-        role,
-        settings,
-        pin_failed_attempts,
-        pin_lock_expires_at,
-        deleted_at
-      `
-    )
+    .select("*")
     .eq("id", profileId)
     .maybeSingle()
 
@@ -309,7 +319,7 @@ async function fetchProfileRow(
     throw new NotFoundError("Profile not found")
   }
 
-  return data
+  return data as ProfileRow
 }
 
 export async function updateProfilePin(
@@ -334,15 +344,15 @@ export async function updateProfilePin(
 
   const pinHash = hashPin(command.pin)
 
-  const existingSettings = (profile.settings ?? {}) as Record<string, unknown>
-  let settingsPayload: Record<string, unknown> | undefined
+  const existingSettings = (profile.settings ?? {}) as Record<string, Json>
+  let settingsPayload: Json | undefined
 
   if (command.storePlainPin) {
-    settingsPayload = { ...existingSettings, pin_plain: command.pin }
+    settingsPayload = { ...existingSettings, pin_plain: command.pin } as Json
   } else if (Object.prototype.hasOwnProperty.call(existingSettings, "pin_plain")) {
     const nextSettings = { ...existingSettings }
     delete nextSettings.pin_plain
-    settingsPayload = nextSettings
+    settingsPayload = nextSettings as Json
   }
 
   const updatePayload: Database["public"]["Tables"]["profiles"]["Update"] = {
