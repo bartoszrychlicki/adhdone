@@ -20,7 +20,25 @@ export const metadata: Metadata = {
 
 export default async function ParentLoginPage({ searchParams }: ParentLoginPageProps) {
   const activeProfile = await getActiveProfile()
-  const logoutSuccess = searchParams?.status === "logged_out"
+  const status = searchParams?.status
+  const banner = (() => {
+    if (status === "logged_out") {
+      return {
+        variant: "success" as const,
+        message: "Pomyślnie wylogowano. Możesz zalogować się ponownie, aby wrócić do panelu rodzica.",
+      }
+    }
+
+    if (status === "confirm_email") {
+      return {
+        variant: "info" as const,
+        message:
+          "Jeśli podałeś prawidłowy adres email, wysłaliśmy link aktywacyjny. Potwierdź konto, aby się zalogować.",
+      }
+    }
+
+    return null
+  })()
 
   if (activeProfile?.role === "parent" || activeProfile?.role === "admin") {
     redirect("/parent/dashboard")
@@ -67,9 +85,15 @@ export default async function ParentLoginPage({ searchParams }: ParentLoginPageP
         </div>
 
         <div className="w-full max-w-md flex-1 space-y-4">
-          {logoutSuccess ? (
-            <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-100">
-              Pomyślnie wylogowano. Możesz zalogować się ponownie, aby wrócić do panelu rodzica.
+          {banner ? (
+            <div
+              className={`rounded-xl border p-4 text-sm ${
+                banner.variant === "success"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
+                  : "border-sky-500/40 bg-sky-500/10 text-sky-100"
+              }`}
+            >
+              {banner.message}
             </div>
           ) : null}
           <ParentLoginForm />

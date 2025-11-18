@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react"
 import { useFormStatus } from "react-dom"
 import Link from "next/link"
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2 } from "lucide-react"
 
 import { signUpParent, type SignupState } from "@/app/auth/parent/actions"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -13,10 +13,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus()
   return (
-    <Button type="submit" size="lg" className="w-full" disabled={pending || disabled}>
+    <Button type="submit" size="lg" className="w-full" disabled={pending}>
       {pending ? (
         <>
           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -118,15 +118,7 @@ export function ParentRegisterForm({ className }: { className?: string }) {
             </Alert>
           ) : null}
 
-          {state.status === "success" ? (
-            <Alert className="border-emerald-500/40 bg-emerald-500/10 text-emerald-100">
-              <CheckCircle2 className="size-4" aria-hidden />
-              <AlertTitle>Sprawdź skrzynkę e-mail</AlertTitle>
-              <AlertDescription>{state.message}</AlertDescription>
-            </Alert>
-          ) : null}
-
-          <SubmitButton disabled={state.status === "success"} />
+          <SubmitButton />
         </form>
 
         <p className="text-center text-xs text-slate-200/80">

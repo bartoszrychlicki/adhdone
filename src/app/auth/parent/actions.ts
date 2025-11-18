@@ -14,7 +14,6 @@ type LoginState =
 export type SignupState =
   | { status: "idle" }
   | { status: "error"; message: string }
-  | { status: "success"; message: string }
 
 function validateEmail(value: FormDataEntryValue | null): string | null {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -119,11 +118,7 @@ export async function signUpParent(
   }
 
   console.log("[signUpParent] success without session (awaiting email confirmation)")
-  return {
-    status: "success",
-    message:
-      "Jeśli podany adres email jest poprawny, wysłaliśmy link aktywacyjny. Sprawdź skrzynkę i potwierdź rejestrację.",
-  }
+  redirect("/auth/parent?status=confirm_email")
 }
 
 export async function loginParent(
