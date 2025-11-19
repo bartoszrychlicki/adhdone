@@ -38,6 +38,11 @@ export default async function OnboardingRewardsPage() {
       .filter(Boolean) as string[]
   )
 
+  const customRewards = (existingRewards ?? []).filter((reward) => {
+    const settings = (reward.settings ?? {}) as { templateId?: string }
+    return !settings.templateId
+  })
+
   return (
     <div className="flex flex-col gap-8 pb-20">
       <Card className="border-slate-800/60 bg-slate-900/40 text-slate-100 backdrop-blur">
@@ -58,6 +63,7 @@ export default async function OnboardingRewardsPage() {
             familyId={activeProfile.familyId}
             templates={REWARD_TEMPLATES}
             existingTemplateIds={presetIds}
+            customRewards={customRewards}
           />
         </CardContent>
       </Card>

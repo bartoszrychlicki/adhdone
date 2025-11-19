@@ -17,13 +17,26 @@ import { cn } from "@/lib/utils"
 
 const initialState: RewardsSetupState = { status: "idle" }
 
+type CustomReward = {
+  id: string
+  name: string
+  cost_points: number
+  description?: string | null // Changed to allow null which comes from DB
+}
+
 type RewardsSetupFormProps = {
   familyId: string
   templates: RewardTemplate[]
   existingTemplateIds: Set<string>
+  customRewards: CustomReward[]
 }
 
-export function RewardsSetupForm({ familyId, templates, existingTemplateIds }: RewardsSetupFormProps) {
+export function RewardsSetupForm({
+  familyId,
+  templates,
+  existingTemplateIds,
+  customRewards,
+}: RewardsSetupFormProps) {
   const [state, formAction] = useActionState(saveRewardsSetupAction, initialState)
 
   const groupedTemplates = useMemo(() => {
@@ -125,6 +138,40 @@ export function RewardsSetupForm({ familyId, templates, existingTemplateIds }: R
             </CardContent>
           </Card>
         </div>
+
+        {customRewards.length > 0 && (
+          <Card className="border-slate-800/60 bg-slate-950/40 text-slate-100">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Twoje własne nagrody</CardTitle>
+              <CardDescription className="text-sm text-slate-200/80">
+                Nagrody, które dodałeś ręcznie do katalogu.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {customRewards.map((reward) => (
+                  <div
+                    key={reward.id}
+                    className="flex flex-col gap-2 rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 text-sm text-slate-200/90"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-white">{reward.name}</span>
+                      <span className="text-xs text-teal-200/90">{reward.cost_points} pkt</span>
+                    </div>
+                    {reward.description && (
+                      <p className="text-xs text-slate-300/80">{reward.description}</p>
+                    )}
+                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+                      <Badge variant="outline" className="border-slate-700/60 bg-slate-900/60 text-[10px] text-slate-300">
+                        Własna
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-slate-800/60 bg-slate-950/40 text-slate-100">
           <CardHeader>
