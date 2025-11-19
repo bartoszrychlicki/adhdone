@@ -5,18 +5,11 @@ import { useFormStatus } from "react-dom"
 import Link from "next/link"
 import { AlertCircle, Loader2 } from "lucide-react"
 
-import { loginParent } from "@/app/auth/parent/actions"
+import { loginParent, type LoginState } from "@/app/auth/parent/actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-
-type LoginState =
-  | { status: "idle" }
-  | {
-      status: "error"
-      message: string
-    }
 
 const initialState: LoginState = { status: "idle" }
 
@@ -62,7 +55,14 @@ export function ParentLoginForm({ className }: { className?: string }) {
               autoComplete="email"
               placeholder="rodzic@example.com"
               required
+              aria-invalid={!!state.status && state.status === "error" && !!state.errors?.email}
+              aria-describedby={state.status === "error" && state.errors?.email ? "email-error" : undefined}
             />
+            {state.status === "error" && state.errors?.email && (
+              <p id="email-error" className="text-sm text-red-400">
+                {state.errors.email[0]}
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -84,10 +84,17 @@ export function ParentLoginForm({ className }: { className?: string }) {
               placeholder="********"
               minLength={6}
               required
+              aria-invalid={!!state.status && state.status === "error" && !!state.errors?.password}
+              aria-describedby={state.status === "error" && state.errors?.password ? "password-error" : undefined}
             />
+            {state.status === "error" && state.errors?.password && (
+              <p id="password-error" className="text-sm text-red-400">
+                {state.errors.password[0]}
+              </p>
+            )}
           </div>
 
-          {state.status === "error" ? (
+          {state.status === "error" && !state.errors ? (
             <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-100">
               <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
               <p>{state.message}</p>

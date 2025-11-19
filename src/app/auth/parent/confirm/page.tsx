@@ -11,6 +11,8 @@ import { ensureParentProfile } from "@/lib/auth/ensure-parent-profile"
 type ParentConfirmPageProps = {
   searchParams: Promise<{
     code?: string
+    error?: string
+    error_description?: string
   }>
 }
 
@@ -25,16 +27,16 @@ function ConfirmationError({ variant, details }: { variant: ErrorVariant; detail
   const copy =
     variant === "missing-code"
       ? {
-          title: "Brakuje kodu potwierdzającego",
-          description:
-            "Link aktywacyjny jest niekompletny. Otwórz ponownie wiadomość od Supabase Auth i kliknij przycisk potwierdzający w całości.",
-        }
+        title: "Brakuje kodu potwierdzającego",
+        description:
+          "Link aktywacyjny jest niekompletny. Otwórz ponownie wiadomość od Supabase Auth i kliknij przycisk potwierdzający w całości.",
+      }
       : {
-          title: "Nie udało się aktywować konta",
-          description:
-            details ??
-            "Kod potwierdzający wygasł lub został już wykorzystany. Zaloguj się, aby poprosić o nowy link lub wyślij go ponownie z formularza rejestracji.",
-        }
+        title: "Nie udało się aktywować konta",
+        description:
+          details ??
+          "Kod potwierdzający wygasł lub został już wykorzystany. Zaloguj się, aby poprosić o nowy link lub wyślij go ponownie z formularza rejestracji.",
+      }
 
   return (
     <div className="mx-auto flex min-h-[70vh] w-full max-w-3xl items-center justify-center px-6">

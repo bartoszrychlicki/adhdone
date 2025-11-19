@@ -6,35 +6,15 @@ import { redirect } from "next/navigation"
 import { createSupabaseServerClient } from "@/lib/supabase"
 import { getAppBaseUrl } from "@/lib/env"
 import { ensureParentProfile } from "@/lib/auth/ensure-parent-profile"
+import { loginSchema, registerSchema } from "@/lib/auth/schemas"
 
-type LoginState =
+export type LoginState =
   | { status: "idle" }
-  | { status: "error"; message: string }
+  | { status: "error"; message: string; errors?: Record<string, string[]> }
 
 export type SignupState =
   | { status: "idle" }
-  | { status: "error"; message: string }
-
-function validateEmail(value: FormDataEntryValue | null): string | null {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return null
-  }
-
-  const email = value.trim().toLowerCase()
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-    return null
-  }
-
-  return email
-}
-
-function validatePassword(value: FormDataEntryValue | null): string | null {
-  if (typeof value !== "string" || value.length < 6) {
-    return null
-  }
-
-  return value
-}
+  | { status: "error"; message: string; errors?: Record<string, string[]> }
 
 function resolveEmailRedirect(): string | undefined {
   try {
@@ -51,39 +31,32 @@ export async function signUpParent(
   formData: FormData
 ): Promise<SignupState> {
   console.log("[signUpParent] start")
-  const email = validateEmail(formData.get("email"))
-  const password = validatePassword(formData.get("password"))
-  const confirmPassword = formData.get("confirmPassword")
-  const acceptTerms = formData.get("acceptTerms") === "true"
 
-  if (!email || !password) {
-    console.warn("[signUpParent] invalid email or password", { emailProvided: Boolean(email) })
+  const rawData = {
+    email: formData.get("email"),
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+    acceptTerms: formData.get("acceptTerms") === "true",
+  }
+
+  const validation = registerSchema.safeParse(rawData)
+
+  if (!validation.success) {
+    console.warn("[signUpParent] validation failed", validation.error.flatten())
     return {
       status: "error",
-      message: "Podaj prawidłowy adres email i hasło (min. 6 znaków).",
+      message: "Formularz zawiera błędy. Popraw je i spróbuj ponownie.",
+      errors: validation.error.flatten().fieldErrors,
     }
   }
 
-  if (typeof confirmPassword !== "string" || confirmPassword !== password) {
-    console.warn("[signUpParent] password mismatch")
-    return {
-      status: "error",
-      message: "Hasła muszą być identyczne.",
-    }
-  }
-
-  if (!acceptTerms) {
-    console.warn("[signUpParent] terms not accepted")
-    return {
-      status: "error",
-      message: "Aby założyć konto, musisz zaakceptować regulamin.",
-    }
-  }
+  const { email, password } = validation.data
 
   const supabase = await createSupabaseServerClient({ allowCookiePersistence: true })
   console.log("[signUpParent] calling supabase.auth.signUp", {
     redirectTo: resolveEmailRedirect(),
   })
+
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -126,16 +99,24 @@ export async function loginParent(
   formData: FormData
 ): Promise<LoginState> {
   console.log("[loginParent] start")
-  const email = validateEmail(formData.get("email"))
-  const password = validatePassword(formData.get("password"))
 
-  if (!email || !password) {
-    console.warn("[loginParent] invalid input", { emailProvided: Boolean(email) })
+  const rawData = {
+    email: formData.get("email"),
+    password: formData.get("password"),
+  }
+
+  const validation = loginSchema.safeParse(rawData)
+
+  if (!validation.success) {
+    console.warn("[loginParent] validation failed", validation.error.flatten())
     return {
       status: "error",
-      message: "Sprawdź poprawność adresu email i hasła.",
+      message: "Sprawdź poprawność wprowadzonych danych.",
+      errors: validation.error.flatten().fieldErrors,
     }
   }
+
+  const { email, password } = validation.data
 
   const supabase = await createSupabaseServerClient({ allowCookiePersistence: true })
   console.log("[loginParent] calling supabase.auth.signInWithPassword")

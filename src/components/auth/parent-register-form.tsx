@@ -58,7 +58,14 @@ export function ParentRegisterForm({ className }: { className?: string }) {
               autoComplete="email"
               required
               placeholder="rodzic@example.com"
+              aria-invalid={!!state.status && state.status === "error" && !!state.errors?.email}
+              aria-describedby={state.status === "error" && state.errors?.email ? "email-error" : undefined}
             />
+            {state.status === "error" && state.errors?.email && (
+              <p id="email-error" className="text-sm text-red-400">
+                {state.errors.email[0]}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -73,7 +80,14 @@ export function ParentRegisterForm({ className }: { className?: string }) {
               minLength={6}
               required
               placeholder="Minimum 6 znaków"
+              aria-invalid={!!state.status && state.status === "error" && !!state.errors?.password}
+              aria-describedby={state.status === "error" && state.errors?.password ? "password-error" : undefined}
             />
+            {state.status === "error" && state.errors?.password && (
+              <p id="password-error" className="text-sm text-red-400">
+                {state.errors.password[0]}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -88,29 +102,43 @@ export function ParentRegisterForm({ className }: { className?: string }) {
               minLength={6}
               required
               placeholder="Powtórz hasło"
+              aria-invalid={!!state.status && state.status === "error" && !!state.errors?.confirmPassword}
+              aria-describedby={state.status === "error" && state.errors?.confirmPassword ? "confirmPassword-error" : undefined}
             />
+            {state.status === "error" && state.errors?.confirmPassword && (
+              <p id="confirmPassword-error" className="text-sm text-red-400">
+                {state.errors.confirmPassword[0]}
+              </p>
+            )}
           </div>
 
-          <div className="flex items-start gap-3 rounded-xl border border-slate-800/60 bg-slate-950/40 p-3 text-sm text-slate-200/80">
-            <Checkbox
-              id="acceptTerms"
-              checked={acceptTerms}
-              onCheckedChange={(value) => setAcceptTerms(value === true)}
-              className="mt-1"
-            />
-            <div className="space-y-1">
-              <label htmlFor="acceptTerms" className="font-medium text-white">
-                Akceptuję regulamin i politykę prywatności
-              </label>
-              <p>
-                Zgoda jest wymagana, aby utworzyć konto. Możesz ją wycofać, kontaktując się z nami w dowolnym
-                momencie.
-              </p>
+          <div className="space-y-2">
+            <div className="flex items-start gap-3 rounded-xl border border-slate-800/60 bg-slate-950/40 p-3 text-sm text-slate-200/80">
+              <Checkbox
+                id="acceptTerms"
+                checked={acceptTerms}
+                onCheckedChange={(value) => setAcceptTerms(value === true)}
+                className="mt-1"
+              />
+              <div className="space-y-1">
+                <label htmlFor="acceptTerms" className="font-medium text-white">
+                  Akceptuję regulamin i politykę prywatności
+                </label>
+                <p>
+                  Zgoda jest wymagana, aby utworzyć konto. Możesz ją wycofać, kontaktując się z nami w dowolnym
+                  momencie.
+                </p>
+              </div>
             </div>
+            {state.status === "error" && state.errors?.acceptTerms && (
+              <p className="text-sm text-red-400">
+                {state.errors.acceptTerms[0]}
+              </p>
+            )}
           </div>
           <input type="hidden" name="acceptTerms" value={acceptTerms ? "true" : "false"} />
 
-          {state.status === "error" ? (
+          {state.status === "error" && !state.errors ? (
             <Alert variant="destructive" className="border-red-500/40 bg-red-500/10 text-red-100">
               <AlertCircle className="size-4" aria-hidden />
               <AlertTitle>Rejestracja nie powiodła się</AlertTitle>

@@ -3,6 +3,13 @@ import type { User } from "@supabase/supabase-js"
 import type { Database } from "@/db/database.types"
 import { createSupabaseServiceRoleClient } from "@/lib/supabase"
 
+const PROFILE_INSERT_MAX_RETRIES = 5
+const PROFILE_INSERT_DELAY_MS = 250
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 export async function ensureParentProfile(user: User | null) {
   if (!user) {
     return
@@ -68,28 +75,37 @@ export async function ensureParentProfile(user: User | null) {
     familyId = newFamily.id
   }
 
-  const { error: profileInsertError } = await serviceClient.from("profiles").insert({
-    auth_user_id: user.id,
-    display_name: displayName,
-    email: user.email,
-    family_id: familyId,
-    role: "parent",
-    settings: {
-      onboarding: {
-        completedSteps: [],
-        isComplete: false,
+  for (let attempt = 0; attempt < PROFILE_INSERT_MAX_RETRIES; attempt += 1) {
+    const { error: profileInsertError } = await serviceClient.from("profiles").insert({
+      auth_user_id: user.id,
+      display_name: displayName,
+      email: user.email,
+      family_id: familyId,
+      role: "parent",
+      settings: {
+        onboarding: {
+          completedSteps: [],
+          isComplete: false,
+        },
       },
-    },
-  })
+    })
 
-  if (profileInsertError) {
-    if (profileInsertError.code === "23503") {
-      console.info("[ensureParentProfile] Auth user not yet replicated; profile provisioning deferred.", {
-        userId: user.id,
-      })
+    if (!profileInsertError) {
       return
     }
 
+    if (profileInsertError.code === "23503" && attempt < PROFILE_INSERT_MAX_RETRIES - 1) {
+      console.info("[ensureParentProfile] Auth user not yet replicated; retrying profile insert.", {
+        userId: user.id,
+        attempt: attempt + 1,
+      })
+      await delay(PROFILE_INSERT_DELAY_MS)
+      continue
+    }
+
     console.error("[ensureParentProfile] Failed to create profile", profileInsertError)
+    return
   }
+
+  console.error("[ensureParentProfile] Exhausted retries creating profile", { userId: user.id })
 }
