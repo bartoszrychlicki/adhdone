@@ -2,9 +2,9 @@
 
 import { useActionState, useMemo } from "react"
 import Image from "next/image"
-import { AlertCircle, CheckCircle2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, Trash2 } from "lucide-react"
 
-import { saveRewardsSetupAction, type RewardsSetupState } from "./actions"
+import { saveRewardsSetupAction, deleteRewardAction, type RewardsSetupState } from "./actions"
 import type { RewardTemplate } from "@/data/reward-templates"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -152,8 +152,19 @@ export function RewardsSetupForm({
                 {customRewards.map((reward) => (
                   <div
                     key={reward.id}
-                    className="flex flex-col gap-2 rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 text-sm text-slate-200/90"
+                    className="relative flex flex-col gap-2 rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 text-sm text-slate-200/90 pr-12"
                   >
+                    <div className="absolute right-2 top-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-slate-400 hover:bg-red-500/10 hover:text-red-400"
+                        formAction={deleteRewardAction.bind(null, reward.id)}
+                      >
+                        <Trash2 className="size-4" />
+                        <span className="sr-only">Usuń</span>
+                      </Button>
+                    </div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-white">{reward.name}</span>
                       <span className="text-xs text-teal-200/90">{reward.cost_points} pkt</span>
@@ -162,7 +173,10 @@ export function RewardsSetupForm({
                       <p className="text-xs text-slate-300/80">{reward.description}</p>
                     )}
                     <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
-                      <Badge variant="outline" className="border-slate-700/60 bg-slate-900/60 text-[10px] text-slate-300">
+                      <Badge
+                        variant="outline"
+                        className="border-slate-700/60 bg-slate-900/60 text-[10px] text-slate-300"
+                      >
                         Własna
                       </Badge>
                     </div>

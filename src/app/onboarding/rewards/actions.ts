@@ -182,3 +182,68 @@ export async function saveRewardsSetupAction(
     }
   }
 }
+
+export async function deleteRewardAction(rewardId: string): Promise<RewardsSetupState> {
+  try {
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      return { status: "error", message: "Twoja sesja wygasła. Zaloguj się ponownie." }
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id, family_id, role")
+      .eq("auth_user_id", user.id)
+      .is("deleted_at", null)
+      .maybeSingle()
+
+    if (profileError || !profile?.family_id) {
+      return {
+        status: "error",
+        message: "Nie znaleziono konta rodzica przypisanego do rodziny.",
+      }
+    }
+
+    if (profile.role !== "parent" && profile.role !== "admin") {
+      return { status: "error", message: "Tylko rodzic może zarządzać nagrodami." }
+    }
+
+    const serviceClient = createSupabaseServiceRoleClient()
+
+    // Verify the reward belongs to the family before deleting
+    const { data: reward, error: fetchError } = await serviceClient
+      .from("rewards")
+      .select("id, family_id")
+      .eq("id", rewardId)
+      .eq("family_id", profile.family_id)
+      .single()
+
+    if (fetchError || !reward) {
+      return { status: "error", message: "Nie znaleziono nagrody lub nie masz do niej dostępu." }
+    }
+
+    const { error: deleteError } = await serviceClient
+      .from("rewards")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", rewardId)
+
+    if (deleteError) {
+      console.error("[deleteRewardAction] Failed to delete reward", deleteError)
+      return { status: "error", message: "Nie udało się usunąć nagrody." }
+    }
+
+    revalidatePath("/onboarding/rewards")
+    return { status: "success", message: "Nagroda została usunięta." }
+  } catch (error) {
+    console.error("[deleteRewardAction] Unexpected error", error)
+    return {
+      status: "error",
+      message: "Wystąpił nieoczekiwany błąd.",
+    }
+  }
+}
