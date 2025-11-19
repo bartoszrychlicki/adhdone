@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useMemo } from "react"
+import { useActionState, useMemo, useTransition } from "react"
 import Image from "next/image"
 import { AlertCircle, CheckCircle2, Trash2 } from "lucide-react"
 
@@ -14,6 +14,32 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { cn } from "@/lib/utils"
+
+function DeleteRewardButton({ rewardId }: { rewardId: string }) {
+  const [isPending, startTransition] = useTransition()
+
+  const handleDelete = () => {
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.append("rewardId", rewardId)
+      await deleteRewardAction(formData)
+    })
+  }
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="h-8 w-8 text-slate-400 hover:bg-red-500/10 hover:text-red-400"
+      onClick={handleDelete}
+      disabled={isPending}
+    >
+      <Trash2 className="size-4" />
+      <span className="sr-only">Usuń</span>
+    </Button>
+  )
+}
 
 const initialState: RewardsSetupState = { status: "idle" }
 
@@ -155,15 +181,7 @@ export function RewardsSetupForm({
                     className="relative flex flex-col gap-2 rounded-2xl border border-slate-800/60 bg-slate-900/50 p-4 text-sm text-slate-200/90 pr-12"
                   >
                     <div className="absolute right-2 top-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-slate-400 hover:bg-red-500/10 hover:text-red-400"
-                        formAction={deleteRewardAction.bind(null, reward.id)}
-                      >
-                        <Trash2 className="size-4" />
-                        <span className="sr-only">Usuń</span>
-                      </Button>
+                      <DeleteRewardButton rewardId={reward.id} />
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold text-white">{reward.name}</span>

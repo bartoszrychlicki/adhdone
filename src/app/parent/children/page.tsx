@@ -94,7 +94,18 @@ export default async function ParentChildrenPage() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-[1fr_auto]">
                   <div className="flex flex-col gap-3">
-                    <ChildTokenCopyButton loginLink={loginLink} />
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold text-white">Link logowania</label>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 overflow-hidden text-ellipsis break-all rounded-md border border-slate-700/60 bg-slate-900/50 px-3 py-2 font-mono text-[11px] text-slate-100">
+                          {loginLink}
+                        </div>
+                        <ChildTokenCopyButton loginLink={loginLink} />
+                      </div>
+                      <p className="text-xs leading-snug text-slate-400">
+                        Udostępnij ten link dziecku. Przy logowaniu poprosimy o aktualny PIN.
+                      </p>
+                    </div>
 
                     <ChildPinManager childId={child.id} currentPin={storedPin} />
 

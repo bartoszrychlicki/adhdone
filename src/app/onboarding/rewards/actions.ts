@@ -183,8 +183,14 @@ export async function saveRewardsSetupAction(
   }
 }
 
-export async function deleteRewardAction(rewardId: string): Promise<RewardsSetupState> {
+export async function deleteRewardAction(formData: FormData): Promise<RewardsSetupState> {
   try {
+    const rewardId = formData.get("rewardId")
+
+    if (typeof rewardId !== "string" || !rewardId) {
+      return { status: "error", message: "Brak identyfikatora nagrody." }
+    }
+
     const supabase = await createSupabaseServerClient()
     const {
       data: { user },
