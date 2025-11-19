@@ -10,6 +10,7 @@ import { getActiveProfile } from "@/lib/auth/get-active-profile"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { cn } from "@/lib/utils"
 
 type RewardRow = {
   id: string
@@ -150,7 +151,16 @@ export default async function ParentRewardsPage() {
                     )}
                     <span>{reward.isActive ? "Nagroda widoczna dla dziecka" : "Nagroda ukryta"}</span>
                   </div>
-                  <Button type="submit" size="sm" variant="outline">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className={cn(
+                      "min-w-[100px] transition-colors",
+                      reward.isActive
+                        ? "bg-white text-slate-950 hover:bg-slate-200 shadow-sm border-transparent font-medium"
+                        : "bg-transparent border border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white"
+                    )}
+                  >
                     {reward.isActive ? "Dezaktywuj" : "Aktywuj"}
                   </Button>
                 </form>
